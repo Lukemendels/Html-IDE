@@ -3319,13 +3319,142 @@ Prism.languages.js = Prism.languages.javascript;
     });
 
     // Standalone File Export
+    // Inject StickShift compliance components into the output HTML if not already present
+    function injectStickShiftCompliance(html, toolFileName) {
+      // Already compliant — don't double-inject
+      if (html.includes('stickshift-skill') || html.includes('STICKSHIFT_TOOL')) return html;
+
+      const baseName = toolFileName.replace(/\.html?$/i, '');
+      const skillSlug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const toolTitle = baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+      // --- CSS ---
+      const ssCSS = `
+  <!-- StickShift Compliance Styles -->
+  <style>
+    .ss-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s ease}
+    .ss-overlay.active{opacity:1;pointer-events:auto}
+    .ss-card{background:#141417;border:1px solid #222227;border-radius:1rem;width:100%;max-width:32rem;padding:1.5rem;box-shadow:0 25px 50px -12px rgba(0,0,0,.5);transform:scale(.95);transition:transform .3s ease}
+    .ss-overlay.active .ss-card{transform:scale(1)}
+    #ss-trigger{position:fixed;bottom:1.25rem;right:1.25rem;z-index:9998;display:flex;align-items:center;gap:.5rem;background:linear-gradient(to right,#7c3aed,#6d28d9);color:#fff;font-size:.7rem;font-weight:600;padding:.5rem 1rem;border-radius:.5rem;border:1px solid rgba(167,139,250,.2);box-shadow:0 4px 14px rgba(124,58,237,.25);cursor:pointer;letter-spacing:.03em;transition:all .2s}
+    #ss-trigger:hover{background:linear-gradient(to right,#6d28d9,#5b21b6);box-shadow:0 6px 20px rgba(124,58,237,.35)}
+  </style>`;
+
+      // --- Floating trigger button (non-invasive, doesn't touch existing UI) ---
+      const ssTrigger = `
+  <!-- StickShift Setup Trigger -->
+  <button id="ss-trigger" onclick="document.getElementById('ss-panel').classList.add('active')">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m12 8-4 4h8z"/></svg>
+    StickShift
+  </button>`;
+
+      // --- Onboarding panel ---
+      const ssPanel = `
+  <!-- StickShift Compliance Onboarding Panel -->
+  <div id="ss-panel" class="ss-overlay" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="ss-card" style="color:#e5e7eb">
+      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #222227;padding-bottom:1rem;margin-bottom:1rem">
+        <div style="display:flex;align-items:center;gap:.625rem">
+          <div style="height:2rem;width:2rem;border-radius:.5rem;background:linear-gradient(135deg,#7c3aed,#6d28d9);display:flex;align-items:center;justify-content:center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m12 8-4 4h8z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:.75rem;font-weight:700;color:#fff">StickShift Setup</div>
+            <div style="font-size:.6rem;color:#6b7280;font-family:monospace">${toolFileName}</div>
+          </div>
+        </div>
+        <button onclick="document.getElementById('ss-panel').classList.remove('active')" style="background:none;border:none;color:#9ca3af;cursor:pointer;padding:.25rem;font-size:1.1rem;line-height:1">&times;</button>
+      </div>
+      <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.1);border-radius:.5rem;padding:.75rem;font-size:.625rem;color:#60a5fa;display:flex;gap:.5rem;margin-bottom:1rem">
+        <svg style="flex-shrink:0;margin-top:1px" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span><strong>Client-Side I/O:</strong> All processing happens locally. Zero network requests.</span>
+      </div>
+      <div style="font-size:.6875rem;color:#d1d5db;line-height:1.6">
+        <div style="font-weight:600;color:#fff;margin-bottom:.25rem">Step 1 — Install the Companion Skill</div>
+        <p style="color:#9ca3af;font-size:.625rem;margin:0 0 .75rem">Copy the skill markdown below and save it as <code style="color:#c084fc;background:rgba(192,132,252,.1);padding:0 .25rem;border-radius:.25rem">skills/${skillSlug}.md</code> in your StickShift directory.</p>
+        <button id="ss-copy-skill" onclick="(function(){var t=document.getElementById('stickshift-skill').innerHTML;var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);var b=document.getElementById('ss-copy-skill');b.textContent='Copied!';setTimeout(function(){b.textContent='Copy Companion Skill Markdown'},2000)})()" style="width:100%;background:#7c3aed;border:none;color:#fff;font-size:.6875rem;font-weight:600;padding:.5rem;border-radius:.5rem;cursor:pointer;margin-bottom:1rem">Copy Companion Skill Markdown</button>
+        <div style="font-weight:600;color:#fff;margin-bottom:.25rem">Step 2 — Open via Cockpit</div>
+        <p style="color:#9ca3af;font-size:.625rem;margin:0">Your LLM agent can now open this tool directly from the StickShift cockpit using the companion skill.</p>
+      </div>
+    </div>
+  </div>`;
+
+      // --- Embedded skill markdown ---
+      const ssSkill = `
+  <!-- StickShift Embedded Companion Skill -->
+  <script type="text/markdown" id="stickshift-skill" data-skill-slug="${skillSlug}">
+---
+okf_version: "0.1"
+type: Skill
+title: ${toolTitle} Code Updater
+description: Modify, edit, or refactor code in the ${toolTitle} HTML tool using SEARCH/REPLACE update packets.
+tags: [skill, html-tool, code-editor]
+---
+
+# ${skillSlug}
+
+## Purpose
+Use this skill to modify code inside the active ${toolTitle} HTML tool.
+
+## How the Agent Edits Code
+Generate one or more SEARCH/REPLACE blocks. The user pastes them into the AI Update Drawer.
+
+### Format
+SEARCH:
+[exact code to find]
+REPLACE:
+[replacement code]
+
+### Rules
+1. SEARCH must match exactly — whitespace included.
+2. Include 2-3 lines of surrounding context.
+3. Stack multiple blocks for multiple edits.
+
+## How to open the tool
+<HTML_OPEN>
+tool: ${toolFileName}
+include:
+- skills/${skillSlug}.md
+</HTML_OPEN>
+
+Instruction: "Copy the block above and click Open HTML Tool in StickShift."
+  <\/script>`;
+
+      // --- JS event wiring (self-contained, no dependency on elements object) ---
+      const ssJS = `
+  <!-- StickShift Runtime Init -->
+  <script>
+  (function(){
+    var STICKSHIFT_TOOL={file:"${toolFileName}",skillSlug:"${skillSlug}",title:"${toolTitle}"};
+    function ssReady(fn){if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn)}else{fn()}}
+    ssReady(function(){
+      var panel=document.getElementById('ss-panel');
+      var trigger=document.getElementById('ss-trigger');
+      if(panel&&trigger){
+        trigger.addEventListener('click',function(){panel.classList.add('active')});
+      }
+    });
+  })();
+  <\/script>`;
+
+      // Inject CSS into <head>
+      html = html.replace(/(<\/head>)/i, ssCSS + '\n$1');
+
+      // Inject trigger button + panel + skill + JS before </body>
+      html = html.replace(/(<\/body>)/i, ssTrigger + '\n' + ssPanel + '\n' + ssSkill + '\n' + ssJS + '\n$1');
+
+      return html;
+    }
+
     elements.downloadBtn.addEventListener('click', () => {
-      const blob = new Blob([state.code], { type: 'text/html;charset=utf-8' });
+      const fileName = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
+      const finalCode = injectStickShiftCompliance(state.code, fileName);
+      const blob = new Blob([finalCode], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
