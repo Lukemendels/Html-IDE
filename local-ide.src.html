@@ -377,6 +377,8 @@
       aiDrawerOpen: false
     };
 
+    let renderDebounceTimer;
+
     // Grab Core UI Handles
     const elements = {
       editor: document.getElementById('editor'),
@@ -441,7 +443,6 @@
     }
 
     // Trigger instant iframe rendering (srcdoc based)
-    let renderDebounceTimer;
     function triggerLivePreview() {
       clearTimeout(renderDebounceTimer);
       renderDebounceTimer = setTimeout(() => {
