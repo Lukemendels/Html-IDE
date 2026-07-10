@@ -2871,7 +2871,7 @@ Prism.languages.js = Prism.languages.javascript;
   <title>Minimalist Pomodoro Clock</title>
   
   <!-- Modern Tailwind styles will render in our live pane -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 </head>
 <body class="bg-slate-950 text-white min-h-screen flex flex-col justify-center items-center font-sans">
@@ -2982,7 +2982,7 @@ Prism.languages.js = Prism.languages.javascript;
     toggleSessionBtn.addEventListener('click', switchMode);
 
     updateDisplay();
-  </script>
+  <\/script>
 </body>
 </html>`,
       currentFileName: 'pomodoro-clock.html',
@@ -3119,7 +3119,7 @@ Prism.languages.js = Prism.languages.javascript;
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clean Workspace Canvas</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
 </head>
 <body class="bg-[#0b0f19] text-gray-100 flex items-center justify-center min-h-screen">
   <div class="p-10 rounded-2xl bg-slate-900 border border-slate-800 text-center max-w-sm">
@@ -3234,17 +3234,17 @@ Prism.languages.js = Prism.languages.javascript;
       
       selectedLibs.forEach(lib => {
         if (lib === 'tailwind') {
-          injectionString += '<!-- Tailwind CSS v4 Browser Engine -->\n<script src="https://cdn.tailwindcss.com"></script>\n';
+          injectionString += '<!-- Tailwind CSS v4 Browser Engine -->\n<script src="https://cdn.tailwindcss.com"><\/script>\n';
         } else if (lib === 'alpine') {
-          injectionString += '<!-- Alpine.js Declarative Framework -->\n<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>\n';
+          injectionString += '<!-- Alpine.js Declarative Framework -->\n<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"><\/script>\n';
         } else if (lib === 'fontawesome') {
           injectionString += '<!-- FontAwesome Icon Suite -->\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">\n';
         } else if (lib === 'animatecss') {
           injectionString += '<!-- Animate.css Styles -->\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">\n';
         } else if (lib === 'chartjs') {
-          injectionString += '<!-- Chart.js Graphing API -->\n<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\n';
+          injectionString += '<!-- Chart.js Graphing API -->\n<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>\n';
         } else if (lib === 'sweetalert2') {
-          injectionString += '<!-- SweetAlert2 Modal Engine -->\n<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>\n';
+          injectionString += '<!-- SweetAlert2 Modal Engine -->\n<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"><\/script>\n';
         }
       });
 
