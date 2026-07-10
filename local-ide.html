@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#0f0f11] text-gray-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local HTML IDE - Portable AI Developer Workspace</title>
+  
+  <!-- Tailwind CSS v4 Browser Engine -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter and JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- PrismJS Tomorrow Dark Theme for Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  
+  <!-- FontAwesome for Premium Interface Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    /* CodeJar + Prism Custom Styling Overrides */
+    .editor-container {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      caret-color: #3b82f6; /* Accent neon blue cursor */
+    }
+
+    pre[class*="language-"],
+    code[class*="language-"] {
+      background: transparent !important;
+      text-shadow: none !important;
+      font-family: inherit !important;
+      font-size: inherit !important;
+      line-height: inherit !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .codejar-editor {
+      outline: none !important;
+      tab-size: 2;
+      -moz-tab-size: 2;
+    }
+
+    /* Custom scrollbars for professional IDE look */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #16161a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2e2e38;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3e3e4f;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Active neon glows */
+    .neon-border-blue {
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    .neon-border-purple {
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+  </style>
+</head>
+<body class="h-full overflow-hidden flex flex-col select-none">
+
+  <!-- TOP DECK: Global Workspace Navigation Header -->
+  <header class="h-14 bg-[#141417] border-b border-[#222227] flex items-center justify-between px-6 z-10">
+    <div class="flex items-center space-x-3">
+      <div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-between p-2 shadow-lg shadow-blue-500/10">
+        <i class="fa-solid fa-code text-white text-xs"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-sm tracking-tight text-white flex items-center space-x-2">
+          <span>Local HTML IDE</span>
+          <span class="text-[10px] bg-blue-500/10 text-blue-400 font-semibold px-2 py-0.5 rounded-full border border-blue-500/20">V1.0 Standalone</span>
+        </h1>
+        <p class="text-[10px] text-gray-500 font-mono">browser-native developer workspace</p>
+      </div>
+    </div>
+
+    <!-- Active file name / Status bar -->
+    <div class="hidden md:flex items-center space-x-2 bg-[#1a1a20] px-4 py-1.5 rounded-md border border-[#272730]">
+      <i class="fa-regular fa-file-code text-blue-400 text-xs"></i>
+      <span class="text-xs font-mono text-gray-300" id="currentFileName">untitled-app.html</span>
+      <span class="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" title="Ready to render"></span>
+    </div>
+
+    <!-- Top Actions -->
+    <div class="flex items-center space-x-3">
+      <label class="flex items-center space-x-2 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-xs text-gray-300 font-medium px-3.5 py-2 rounded-lg cursor-pointer transition-all">
+        <i class="fa-solid fa-folder-open text-blue-400"></i>
+        <span>Open HTML File</span>
+        <input type="file" id="fileUploadInput" accept=".html,.htm" class="hidden">
+      </label>
+      
+      <button id="downloadBtn" class="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-lg shadow-blue-500/10 border border-blue-400/20 cursor-pointer transition-all">
+        <i class="fa-solid fa-circle-down"></i>
+        <span>Download Completed Tool</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE BODY: Core Split Screen Interface -->
+  <main class="flex-1 flex overflow-hidden">
+    
+    <!-- LEFT PANEL: Editor, Library Settings, and AI Packet Drawer -->
+    <section class="w-1/2 flex flex-col bg-[#141417] border-r border-[#222227] h-full overflow-hidden">
+      
+      <!-- Section A: Workspace Controls & Selector Panel (Tabs and Injectables) -->
+      <div class="p-4 bg-[#111113] border-b border-[#222227] space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-1">
+            <span class="text-xs font-semibold text-gray-400 tracking-wider uppercase">Injectable Libraries</span>
+            <i class="fa-solid fa-circle-info text-[10px] text-gray-500 cursor-help" title="These libraries will be neatly injected into your source during file export/download."></i>
+          </div>
+          <button id="toggleLibrariesBtn" class="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1 cursor-pointer">
+            <span id="libraryToggleText">Hide Panel</span>
+            <i class="fa-solid fa-chevron-up text-[10px]" id="libraryToggleIcon"></i>
+          </button>
+        </div>
+
+        <!-- Injectable Libraries Grid (Checkboxes) -->
+        <div id="librariesPanel" class="grid grid-cols-2 md:grid-cols-3 gap-2.5 transition-all duration-300">
+          <label class="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
+            <input type="checkbox" value="tailwind" checked class="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer">
+            <div class="text-[11px]">
+              <div class="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Tailwind CSS</div>
+              <div class="text-gray-500 font-mono text-[9px]">v4 Browser Engine</div>
+            </div>
+          </label>
+          <label class="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
+            <input type="checkbox" value="alpine" class="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer">
+            <div class="text-[11px]">
+              <div class="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Alpine.js</div>
+              <div class="text-gray-500 font-mono text-[9px]">Reactive Framework</div>
+            </div>
+          </label>
+          <label class="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
+            <input type="checkbox" value="fontawesome" class="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer">
+            <div class="text-[11px]">
+              <div class="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">FontAwesome</div>
+              <div class="text-gray-500 font-mono text-[9px]">v6 Icon Suite</div>
+            </div>
+          </label>
+          <label class="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
+            <input type="checkbox" value="animatecss" class="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer">
+            <div class="text-[11px]">
+              <div class="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Animate.css</div>
+              <div class="text-gray-500 font-mono text-[9px]">Declarative FX</div>
+            </div>
+          </label>
+          <label class="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
+            <input type="checkbox" value="chartjs" class="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer">
+            <div class="text-[11px]">
+              <div class="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Chart.js</div>
+              <div class="text-gray-500 font-mono text-[9px]">Interactive Graphs</div>
+            </div>
+          </label>
+          <label class="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
+            <input type="checkbox" value="sweetalert2" class="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer">
+            <div class="text-[11px]">
+              <div class="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">SweetAlert2</div>
+              <div class="text-gray-500 font-mono text-[9px]">Dialogs/Modals</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Custom Script Injection Drawer -->
+        <div id="customLibContainer" class="hidden pt-1">
+          <label class="block text-[10px] text-gray-500 font-mono mb-1">Custom Libraries / Style Injections (Pasted scripts/stylesheets):</label>
+          <textarea id="customLibText" placeholder="e.g. <script src='https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js'></script>" class="w-full h-14 bg-[#17171c] border border-gray-800 rounded-lg p-2 text-[10px] font-mono text-gray-400 focus:outline-none focus:border-blue-500/50 resize-none transition-all"></textarea>
+        </div>
+      </div>
+
+      <!-- Section B: Code Editor Pane with Line Numbers -->
+      <div class="flex-1 flex flex-col min-h-0 bg-[#16161a]">
+        <!-- Gutter stats / Toolbar -->
+        <div class="h-9 bg-[#111113] px-4 flex items-center justify-between border-b border-[#222227] text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="text-gray-400 font-mono text-[11px]">Source Editor</span>
+            <span class="text-gray-600">|</span>
+            <span class="text-gray-500 text-[10px] font-mono" id="editorLineCount">1 lines</span>
+          </div>
+          <div class="flex items-center space-x-3 text-gray-500">
+            <button id="copyCodeBtn" class="hover:text-blue-400 transition-colors cursor-pointer" title="Copy code to clipboard">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+            <button id="resetCodeBtn" class="hover:text-red-400 transition-colors cursor-pointer" title="Reset to simple boilerplate template">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- CodeJar Editor Window with Integrated Scroll-Synchronized Line Numbers -->
+        <div class="flex-1 flex overflow-hidden editor-container relative">
+          <!-- Gutter Column for Line Numbers -->
+          <div id="gutter" class="select-none py-4 text-right pr-3 pl-4 bg-[#111113]/80 text-[#4c4c5e] border-r border-[#222227] overflow-hidden text-xs leading-6 no-scrollbar flex flex-col h-full w-12 shrink-0">
+            <div>1</div>
+          </div>
+          
+          <!-- Editing Area -->
+          <div id="editor" class="codejar-editor flex-1 p-4 overflow-auto h-full text-xs leading-6 language-html focus:outline-none text-[#e2e8f0]" style="white-space: pre; word-break: keep-all;"></div>
+        </div>
+      </div>
+
+      <!-- Section C: Collapsible AI Packet Parser (Drawer) -->
+      <div class="border-t border-[#222227] bg-[#111113] flex flex-col shadow-inner transition-all duration-300" id="aiDrawer">
+        <!-- Drawer Trigger Header -->
+        <button id="toggleAiDrawerBtn" class="w-full px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-[#16161a] transition-all">
+          <div class="flex items-center space-x-2.5">
+            <div class="h-6 w-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+              <i class="fa-solid fa-sparkles text-purple-400 text-xs animate-pulse"></i>
+            </div>
+            <div class="text-left">
+              <span class="text-xs font-semibold text-gray-200">Paste AI Update Packet</span>
+              <p class="text-[9px] text-gray-500 font-mono">Apply modifications using strict SEARCH: & REPLACE: structure</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-3">
+            <span class="text-[10px] bg-purple-500/10 text-purple-400 font-semibold px-2 py-0.5 rounded-full border border-purple-500/20">Ctrl + Enter</span>
+            <i class="fa-solid fa-chevron-up text-gray-500 text-xs transition-transform duration-300" id="aiDrawerIcon"></i>
+          </div>
+        </button>
+
+        <!-- Drawer Content (Collapsible) -->
+        <div id="aiDrawerContent" class="px-5 pb-5 space-y-3.5 overflow-hidden transition-all duration-300">
+          <div class="relative">
+            <textarea id="aiPacketInput" placeholder="SEARCH:&#10;<div class=&quot;old-code&quot;>...</div>&#10;&#10;REPLACE:&#10;<div class=&quot;new-code&quot;>...</div>" class="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"></textarea>
+            
+            <div class="absolute right-3.5 bottom-3 text-[10px] text-gray-600 font-mono select-none">
+              Supports multiple blocks
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div class="text-[10px] text-gray-500">
+              <a href="#" id="loadExamplePacket" class="text-purple-400 hover:underline">Load Example Packet</a>
+            </div>
+            
+            <button id="applyChangesBtn" class="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-semibold px-4.5 py-2 rounded-lg cursor-pointer transition-all border border-purple-400/20 shadow-lg shadow-purple-500/10">
+              <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <span>Apply Changes</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT PANEL: Full Height Live Preview Renderer -->
+    <section class="w-1/2 flex flex-col bg-[#0f0f11] h-full overflow-hidden">
+      
+      <!-- Frame Controls Bar -->
+      <div class="h-12 bg-[#121214] border-b border-[#222227] px-6 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <i class="fa-solid fa-eye text-gray-500 text-xs"></i>
+          <span class="text-xs font-semibold text-gray-300 tracking-wider uppercase">Live Render Preview</span>
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <!-- Frame Resolution Selectors -->
+          <div class="flex items-center space-x-1.5 bg-[#17171c] p-0.5 rounded-lg border border-[#23232c]">
+            <button data-res="full" class="res-btn active px-2.5 py-1 rounded-md text-[10px] font-medium transition-all text-white bg-blue-600/20 border border-blue-500/30 cursor-pointer">
+              <i class="fa-solid fa-laptop mr-1 text-[9px]"></i> Full
+            </button>
+            <button data-res="tablet" class="res-btn px-2.5 py-1 rounded-md text-[10px] font-medium transition-all text-gray-400 hover:text-white border border-transparent cursor-pointer">
+              <i class="fa-solid fa-tablet-screen-button mr-1 text-[9px]"></i> Tablet
+            </button>
+            <button data-res="mobile" class="res-btn px-2.5 py-1 rounded-md text-[10px] font-medium transition-all text-gray-400 hover:text-white border border-transparent cursor-pointer">
+              <i class="fa-solid fa-mobile-screen-button mr-1 text-[9px]"></i> Mobile
+            </button>
+          </div>
+
+          <!-- Refresh action -->
+          <button id="refreshIframeBtn" class="h-7 w-7 rounded-lg bg-[#1a1a20] hover:bg-[#22222a] border border-[#2a2a35] flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer" title="Force Render Frame">
+            <i class="fa-solid fa-rotate-right text-xs" id="refreshIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Frame Host Workspace -->
+      <div class="flex-1 bg-[#09090b] flex items-center justify-center p-4 overflow-hidden relative">
+        <div id="iframeContainer" class="w-full h-full bg-white rounded-xl shadow-2xl overflow-hidden transition-all duration-300 border border-gray-900/50">
+          <iframe id="previewFrame" class="w-full h-full bg-white block" sandbox="allow-scripts"></iframe>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- CUSTOM SCRIPTS INTEGRATING CLIENT LOGIC -->
+  <script type="module">
+    // Load CodeJar via CDN ES Modules
+    import { CodeJar } from 'https://cdn.jsdelivr.net/npm/codejar@1.1.0/codejar.min.js';
+
+    // Global Application State
+    const state = {
+      code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimalist Pomodoro Clock</title>
+  
+  <!-- Modern Tailwind styles will render in our live pane -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col justify-center items-center font-sans">
+
+  <div class="w-full max-w-md mx-auto p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-md text-center">
+    
+    <!-- Title and details -->
+    <h1 class="text-2xl font-bold tracking-tight text-white mb-2">Focus Session</h1>
+    <p class="text-xs text-slate-400 font-medium mb-12 uppercase tracking-widest">Time to align and create</p>
+
+    <!-- Circular Dial Visual -->
+    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
+      <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
+      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45"></div>
+      
+      <!-- Time counter -->
+      <div class="z-10">
+        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
+        <div id="sessionType" class="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
+      </div>
+    </div>
+
+    <!-- Clock Control Actions -->
+    <div class="flex items-center justify-center space-x-6">
+      <button id="resetTimer" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all cursor-pointer">
+        <i class="fa-solid fa-rotate-left text-sm"></i>
+      </button>
+      
+      <button id="playPauseTimer" class="h-16 w-16 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-500/20 scale-100 hover:scale-105 active:scale-95">
+        <i id="playIcon" class="fa-solid fa-play text-lg translate-x-0.5"></i>
+      </button>
+      
+      <button id="toggleSession" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all cursor-pointer">
+        <i class="fa-solid fa-circle-half-stroke text-sm"></i>
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // Embedded micro clock mechanics
+    let timeRemaining = 25 * 60;
+    let timerRunning = false;
+    let timerInterval = null;
+    let isWorkSession = true;
+
+    const timerDisplay = document.getElementById('timerDisplay');
+    const playPauseBtn = document.getElementById('playPauseTimer');
+    const playIcon = document.getElementById('playIcon');
+    const resetBtn = document.getElementById('resetTimer');
+    const toggleSessionBtn = document.getElementById('toggleSession');
+    const sessionType = document.getElementById('sessionType');
+    const radialFill = document.getElementById('radialFill');
+
+    function updateDisplay() {
+      const minutes = Math.floor(timeRemaining / 60);
+      const seconds = timeRemaining % 60;
+      timerDisplay.textContent = \`\${minutes.toString().padStart(2, '0')}:\${seconds.toString().padStart(2, '0')}\`;
+      
+      // Rotate radial fill slightly to simulate ticking down
+      const total = isWorkSession ? 25 * 60 : 5 * 60;
+      const progress = (total - timeRemaining) / total;
+      radialFill.style.transform = \`rotate(\${45 + (progress * 360)}deg)\`;
+    }
+
+    function toggleTimer() {
+      if (timerRunning) {
+        clearInterval(timerInterval);
+        playIcon.className = "fa-solid fa-play text-lg translate-x-0.5";
+        timerRunning = false;
+      } else {
+        timerInterval = setInterval(() => {
+          if (timeRemaining > 0) {
+            timeRemaining--;
+            updateDisplay();
+          } else {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            playIcon.className = "fa-solid fa-play text-lg translate-x-0.5";
+            alert(isWorkSession ? "Work session completed! Time for a short break." : "Break finished! Back to work.");
+            switchMode();
+          }
+        }, 1000);
+        playIcon.className = "fa-solid fa-pause text-lg";
+        timerRunning = true;
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      playIcon.className = "fa-solid fa-play text-lg translate-x-0.5";
+      timeRemaining = isWorkSession ? 25 * 60 : 5 * 60;
+      updateDisplay();
+    }
+
+    function switchMode() {
+      isWorkSession = !isWorkSession;
+      timeRemaining = isWorkSession ? 25 * 60 : 5 * 60;
+      sessionType.textContent = isWorkSession ? "Work Interval" : "Short Break";
+      sessionType.className = isWorkSession ? "text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2" : "text-[10px] text-teal-400 uppercase tracking-widest font-semibold mt-2";
+      playPauseBtn.className = isWorkSession ? "h-16 w-16 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-500/20" : "h-16 w-16 rounded-full bg-teal-600 hover:bg-teal-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-teal-500/20";
+      resetTimer();
+    }
+
+    playPauseBtn.addEventListener('click', toggleTimer);
+    resetBtn.addEventListener('click', resetTimer);
+    toggleSessionBtn.addEventListener('click', switchMode);
+
+    updateDisplay();
+  </script>
+</body>
+</html>`,
+      currentFileName: 'pomodoro-clock.html',
+      librariesOpen: true,
+      aiDrawerOpen: false
+    };
+
+    // Grab Core UI Handles
+    const elements = {
+      editor: document.getElementById('editor'),
+      gutter: document.getElementById('gutter'),
+      previewFrame: document.getElementById('previewFrame'),
+      editorLineCount: document.getElementById('editorLineCount'),
+      currentFileName: document.getElementById('currentFileName'),
+      fileUploadInput: document.getElementById('fileUploadInput'),
+      downloadBtn: document.getElementById('downloadBtn'),
+      copyCodeBtn: document.getElementById('copyCodeBtn'),
+      resetCodeBtn: document.getElementById('resetCodeBtn'),
+      refreshIframeBtn: document.getElementById('refreshIframeBtn'),
+      aiPacketInput: document.getElementById('aiPacketInput'),
+      applyChangesBtn: document.getElementById('applyChangesBtn'),
+      loadExamplePacket: document.getElementById('loadExamplePacket'),
+      toggleAiDrawerBtn: document.getElementById('toggleAiDrawerBtn'),
+      aiDrawer: document.getElementById('aiDrawer'),
+      aiDrawerContent: document.getElementById('aiDrawerContent'),
+      aiDrawerIcon: document.getElementById('aiDrawerIcon'),
+      toggleLibrariesBtn: document.getElementById('toggleLibrariesBtn'),
+      librariesPanel: document.getElementById('librariesPanel'),
+      customLibContainer: document.getElementById('customLibContainer'),
+      customLibText: document.getElementById('customLibText'),
+      libraryToggleText: document.getElementById('libraryToggleText'),
+      libraryToggleIcon: document.getElementById('libraryToggleIcon'),
+      iframeContainer: document.getElementById('iframeContainer'),
+      resBtns: document.querySelectorAll('.res-btn'),
+      refreshIcon: document.getElementById('refreshIcon')
+    };
+
+    // Initialize CodeJar Editor
+    const highlight = (editor) => {
+      // Prism Tomorrow Highlights
+      Prism.highlightElement(editor);
+    };
+
+    const jar = CodeJar(elements.editor, highlight, {
+      tab: '  '
+    });
+
+    // Populate Initial Editor Code
+    jar.updateCode(state.code);
+    syncLineNumbers();
+    triggerLivePreview();
+
+    // Monitor input changes in the editor
+    jar.onUpdate((newCode) => {
+      state.code = newCode;
+      syncLineNumbers();
+      triggerLivePreview();
+    });
+
+    // Synchronize Scroll between codejar text and line number gutter
+    elements.editor.addEventListener('scroll', (e) => {
+      elements.gutter.scrollTop = e.target.scrollTop;
+    });
+
+    // Compute and synchronize line numbers gutter
+    function syncLineNumbers() {
+      const lineCount = state.code.split('\n').length;
+      elements.editorLineCount.textContent = `${lineCount} line${lineCount === 1 ? '' : 's'}`;
+      
+      let gutterHTML = '';
+      for (let i = 1; i <= Math.max(1, lineCount); i++) {
+        gutterHTML += `<div>${i}</div>`;
+      }
+      elements.gutter.innerHTML = gutterHTML;
+    }
+
+    // Trigger instant iframe rendering (srcdoc based)
+    let renderDebounceTimer;
+    function triggerLivePreview() {
+      clearTimeout(renderDebounceTimer);
+      renderDebounceTimer = setTimeout(() => {
+        elements.previewFrame.srcdoc = state.code;
+      }, 250);
+    }
+
+    // Resolution Frame Toggles (Desktop, Tablet, Mobile)
+    elements.resBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // Clear active class from all buttons
+        elements.resBtns.forEach(b => {
+          b.classList.remove('active', 'text-white', 'bg-blue-600/20', 'border-blue-500/30');
+          b.classList.add('text-gray-400', 'border-transparent');
+        });
+
+        // Add active state to selected button
+        const clicked = e.currentTarget;
+        clicked.classList.add('active', 'text-white', 'bg-blue-600/20', 'border-blue-500/30');
+        clicked.classList.remove('text-gray-400', 'border-transparent');
+
+        const mode = clicked.dataset.res;
+        if (mode === 'full') {
+          elements.iframeContainer.style.width = '100%';
+          elements.iframeContainer.style.maxWidth = '100%';
+        } else if (mode === 'tablet') {
+          elements.iframeContainer.style.width = '768px';
+          elements.iframeContainer.style.maxWidth = '100%';
+        } else if (mode === 'mobile') {
+          elements.iframeContainer.style.width = '375px';
+          elements.iframeContainer.style.maxWidth = '100%';
+        }
+      });
+    });
+
+    // Copy Current Editor Source
+    elements.copyCodeBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(state.code).then(() => {
+        const icon = elements.copyCodeBtn.querySelector('i');
+        icon.className = "fa-solid fa-check text-green-400";
+        setTimeout(() => {
+          icon.className = "fa-regular fa-copy";
+        }, 1500);
+      });
+    });
+
+    // Clear / Reset Editor to simple base boilerplate
+    elements.resetCodeBtn.addEventListener('click', () => {
+      if (confirm('Are you sure you want to reset the workspace? Any current modifications will be lost.')) {
+        const boilerplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clean Workspace Canvas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 flex items-center justify-center min-h-screen">
+  <div class="p-10 rounded-2xl bg-slate-900 border border-slate-800 text-center max-w-sm">
+    <h1 class="text-xl font-bold text-white mb-2">Workspace Reset</h1>
+    <p class="text-xs text-slate-400">Pasted AI modifications or uploaded codes will populate this canvas.</p>
+  </div>
+</body>
+</html>`;
+        state.code = boilerplate;
+        jar.updateCode(boilerplate);
+        state.currentFileName = 'blank-app.html';
+        elements.currentFileName.textContent = 'blank-app.html';
+        syncLineNumbers();
+        triggerLivePreview();
+      }
+    });
+
+    // Refresh Live Iframe Frame
+    elements.refreshIframeBtn.addEventListener('click', () => {
+      elements.refreshIcon.classList.add('animate-spin');
+      elements.previewFrame.srcdoc = state.code;
+      setTimeout(() => {
+        elements.refreshIcon.classList.remove('animate-spin');
+      }, 600);
+    });
+
+    // Toggle Collapsible Injectables Drawer
+    elements.toggleLibrariesBtn.addEventListener('click', () => {
+      state.librariesOpen = !state.librariesOpen;
+      if (state.librariesOpen) {
+        elements.librariesPanel.classList.remove('hidden');
+        elements.customLibContainer.classList.remove('hidden');
+        elements.libraryToggleText.textContent = 'Hide Panel';
+        elements.libraryToggleIcon.className = 'fa-solid fa-chevron-up text-[10px]';
+      } else {
+        elements.librariesPanel.classList.add('hidden');
+        elements.customLibContainer.classList.add('hidden');
+        elements.libraryToggleText.textContent = 'Show Panel';
+        elements.libraryToggleIcon.className = 'fa-solid fa-chevron-down text-[10px]';
+      }
+    });
+
+    // Toggle Collapsible AI Drawer
+    elements.toggleAiDrawerBtn.addEventListener('click', () => {
+      state.aiDrawerOpen = !state.aiDrawerOpen;
+      updateAiDrawerLayout();
+    });
+
+    function updateAiDrawerLayout() {
+      if (state.aiDrawerOpen) {
+        elements.aiDrawerContent.style.height = 'auto';
+        elements.aiDrawerIcon.style.transform = 'rotate(180deg)';
+        elements.aiDrawer.classList.add('neon-border-purple');
+      } else {
+        elements.aiDrawerContent.style.height = '0px';
+        elements.aiDrawerIcon.style.transform = 'rotate(0deg)';
+        elements.aiDrawer.classList.remove('neon-border-purple');
+      }
+    }
+
+    // Set initial Collapsible state
+    elements.aiDrawerContent.style.height = '0px';
+
+    // File Upload Handler
+    elements.fileUploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const loadedCode = evt.target.result;
+        state.code = loadedCode;
+        jar.updateCode(loadedCode);
+        state.currentFileName = file.name;
+        elements.currentFileName.textContent = file.name;
+        syncLineNumbers();
+        triggerLivePreview();
+      };
+      reader.readAsText(file);
+    });
+
+    // Library Packaging and Standalone File Export
+    elements.downloadBtn.addEventListener('click', () => {
+      const finalCode = compileFinalHTML();
+      const blob = new Blob([finalCode], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+
+    function compileFinalHTML() {
+      let activeCode = state.code;
+      
+      // Collect selected libraries checked in UI
+      const selectedLibs = [];
+      const checkboxes = document.querySelectorAll('#librariesPanel input[type="checkbox"]');
+      checkboxes.forEach(box => {
+        if (box.checked) {
+          selectedLibs.push(box.value);
+        }
+      });
+      
+      const customLib = elements.customLibText.value || '';
+      
+      let injectionString = '\n<!-- INJECTED LIBRARIES BY LOCAL HTML IDE -->\n';
+      
+      selectedLibs.forEach(lib => {
+        if (lib === 'tailwind') {
+          injectionString += '<!-- Tailwind CSS v4 Browser Engine -->\n<script src="https://cdn.tailwindcss.com"></script>\n';
+        } else if (lib === 'alpine') {
+          injectionString += '<!-- Alpine.js Declarative Framework -->\n<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>\n';
+        } else if (lib === 'fontawesome') {
+          injectionString += '<!-- FontAwesome Icon Suite -->\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">\n';
+        } else if (lib === 'animatecss') {
+          injectionString += '<!-- Animate.css Styles -->\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">\n';
+        } else if (lib === 'chartjs') {
+          injectionString += '<!-- Chart.js Graphing API -->\n<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\n';
+        } else if (lib === 'sweetalert2') {
+          injectionString += '<!-- SweetAlert2 Modal Engine -->\n<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>\n';
+        }
+      });
+
+      if (customLib.trim()) {
+        injectionString += `<!-- User Pasted Style/Script Injectables -->\n${customLib.trim()}\n`;
+      }
+      
+      injectionString += '<!-- END OF INJECTED LIBRARIES -->\n';
+      
+      const bodyCloseRegex = /<\/body>/i;
+      const headCloseRegex = /<\/head>/i;
+      
+      if (bodyCloseRegex.test(activeCode)) {
+        return activeCode.replace(bodyCloseRegex, (match) => injectionString + match);
+      } else if (headCloseRegex.test(activeCode)) {
+        return activeCode.replace(headCloseRegex, (match) => injectionString + match);
+      } else {
+        return activeCode + injectionString;
+      }
+    }
+
+    // AI Packet parser for SEARCH & REPLACE blocks
+    elements.applyChangesBtn.addEventListener('click', applyPacketUpdates);
+    
+    // Ctrl + Enter inside textarea trigger
+    elements.aiPacketInput.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        applyPacketUpdates();
+      }
+    });
+
+    function applyPacketUpdates() {
+      const packet = elements.aiPacketInput.value;
+      if (!packet.trim()) {
+        alert('Please paste a non-empty AI Update Packet first containing SEARCH: and REPLACE: blocks.');
+        return;
+      }
+
+      try {
+        const lines = packet.replace(/\r\n/g, '\n').split('\n');
+        let blocks = [];
+        let currentBlock = null;
+        let stateMode = 'IDLE'; // IDLE, SEARCH, REPLACE
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmed = line.trim();
+          
+          if (trimmed === 'SEARCH:') {
+            if (currentBlock && stateMode === 'REPLACE') {
+              blocks.push(currentBlock);
+            }
+            currentBlock = { search: '', replace: '' };
+            stateMode = 'SEARCH';
+            continue;
+          } else if (trimmed === 'REPLACE:') {
+            if (stateMode === 'SEARCH' && currentBlock) {
+              stateMode = 'REPLACE';
+              continue;
+            }
+          }
+          
+          if (stateMode === 'SEARCH' && currentBlock) {
+            currentBlock.search += line + '\n';
+          } else if (stateMode === 'REPLACE' && currentBlock) {
+            currentBlock.replace += line + '\n';
+          }
+        }
+        
+        if (currentBlock && stateMode === 'REPLACE') {
+          blocks.push(currentBlock);
+        }
+        
+        // Trim final newlines added by parser loops
+        blocks = blocks.map(b => ({
+          search: b.search.slice(0, -1),
+          replace: b.replace.slice(0, -1)
+        }));
+        
+        if (blocks.length === 0) {
+          throw new Error('No valid SEARCH: and REPLACE: tags found. Check syntax:\n\nSEARCH:\n[code to find]\nREPLACE:\n[code to replace]');
+        }
+        
+        let activeWorkspaceText = state.code;
+        let successCount = 0;
+        let failedBlocks = [];
+        
+        for (let idx = 0; idx < blocks.length; idx++) {
+          const block = blocks[idx];
+          
+          // Match 1: Try direct exact index lookup
+          const exactIdx = activeWorkspaceText.indexOf(block.search);
+          if (exactIdx !== -1) {
+            activeWorkspaceText = activeWorkspaceText.replace(block.search, block.replace);
+            successCount++;
+          } else {
+            // Match 2: Flexible trim-matching logic for space/whitespace deviations
+            const docLines = activeWorkspaceText.split('\n');
+            const searchLines = block.search.split('\n').map(l => l.trim()).filter(l => l !== '');
+            
+            let matchedIndex = -1;
+            
+            for (let dIdx = 0; dIdx <= docLines.length - searchLines.length; dIdx++) {
+              let matches = true;
+              for (let sIdx = 0; sIdx < searchLines.length; sIdx++) {
+                if (docLines[dIdx + sIdx].trim() !== searchLines[sIdx]) {
+                  matches = false;
+                  break;
+                }
+              }
+              if (matches) {
+                matchedIndex = dIdx;
+                break;
+              }
+            }
+            
+            if (matchedIndex !== -1 && searchLines.length > 0) {
+              // Indent tracking to preserve coding architecture
+              const leadingSpacing = docLines[matchedIndex].match(/^\s*/)[0];
+              const formattedReplacement = block.replace.split('\n').map((line, lIdx) => {
+                if (lIdx === 0) return line;
+                return leadingSpacing + line;
+              }).join('\n');
+              
+              docLines.splice(matchedIndex, searchLines.length, formattedReplacement);
+              activeWorkspaceText = docLines.join('\n');
+              successCount++;
+            } else {
+              failedBlocks.push({
+                num: idx + 1,
+                snippet: block.search.substring(0, 100) + (block.search.length > 100 ? '...' : '')
+              });
+            }
+          }
+        }
+        
+        // Report outcomes back to user
+        if (successCount > 0) {
+          state.code = activeWorkspaceText;
+          jar.updateCode(activeWorkspaceText);
+          syncLineNumbers();
+          triggerLivePreview();
+          
+          if (failedBlocks.length > 0) {
+            alert(`Applied ${successCount} modifications successfully!\n\nFailed to apply ${failedBlocks.length} updates:\n` + failedBlocks.map(f => `Block ${f.num}: "${f.snippet}"`).join('\n'));
+          } else {
+            // Highlight changes applied successfully
+            const animElement = elements.applyChangesBtn;
+            animElement.classList.add('bg-green-600', 'from-green-600', 'to-emerald-500');
+            const origSpan = animElement.querySelector('span').textContent;
+            animElement.querySelector('span').textContent = 'Applied!';
+            
+            setTimeout(() => {
+              animElement.classList.remove('bg-green-600', 'from-green-600', 'to-emerald-500');
+              animElement.querySelector('span').textContent = origSpan;
+            }, 1500);
+            
+            // Clear textarea inputs on pure successes
+            elements.aiPacketInput.value = '';
+          }
+        } else {
+          alert('Failed to apply updates. Could not find match for specified search strings inside the current editor code. Check for spaces or line breaks.');
+        }
+        
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    // Load sample packet helper link
+    elements.loadExamplePacket.addEventListener('click', (e) => {
+      e.preventDefault();
+      elements.aiPacketInput.value = `SEARCH:
+    <!-- Circular Dial Visual -->
+    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
+      <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
+      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45"></div>
+      
+      <!-- Time counter -->
+      <div class="z-10">
+        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
+        <div id="sessionType" class="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
+      </div>
+    </div>
+REPLACE:
+    <!-- Circular Dial Visual (Enhanced with subtle glow border) -->
+    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
+      <div class="absolute inset-0 rounded-full border-4 border-purple-500/30 shadow-lg shadow-purple-500/20"></div>
+      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 border-r-purple-500 transition-all duration-1000 rotate-45"></div>
+      
+      <!-- Time counter -->
+      <div class="z-10">
+        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]">25:00</span>
+        <div id="sessionType" class="text-[10px] text-purple-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
+      </div>
+    </div>`;
+      if (!state.aiDrawerOpen) {
+        state.aiDrawerOpen = true;
+        updateAiDrawerLayout();
+      }
+    });
+
+  </script>
+</body>
+</html>

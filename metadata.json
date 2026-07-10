@@ -1,0 +1,6 @@
+{
+  "name": "Local HTML IDE",
+  "description": "A lightweight, self-contained browser-based development workspace for building standalone HTML applications with live preview, library packaging, and AI update packet parsing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
