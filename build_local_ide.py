@@ -12,6 +12,19 @@ PRISM_CSS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "themes"
 PRISM_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "prism.js")
 CODEJAR_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "codejar", "dist", "codejar.js")
 
+# Offline library vault paths — resolved from locally installed npm packages
+LIB_PATHS = {
+    "lib_jszip":         os.path.join(WORKSPACE_DIR, "node_modules", "jszip", "dist", "jszip.min.js"),
+    "lib_docxtemplater": os.path.join(WORKSPACE_DIR, "node_modules", "docxtemplater", "build", "docxtemplater.min.js"),
+    "lib_docx":          os.path.join(WORKSPACE_DIR, "node_modules", "docx", "dist", "index.iife.js"),
+    "lib_mammoth":       os.path.join(WORKSPACE_DIR, "node_modules", "mammoth", "mammoth.browser.min.js"),
+    "lib_sheetjs":       os.path.join(WORKSPACE_DIR, "node_modules", "xlsx", "dist", "xlsx.full.min.js"),
+    "lib_pptxgen":       os.path.join(WORKSPACE_DIR, "node_modules", "pptxgenjs", "dist", "pptxgen.bundle.js"),
+    "lib_pdfjs":         os.path.join(WORKSPACE_DIR, "node_modules", "pdfjs-dist", "build", "pdf.min.mjs"),
+    "lib_alpine":        os.path.join(WORKSPACE_DIR, "node_modules", "alpinejs", "dist", "cdn.min.js"),
+    "lib_picocss":       os.path.join(WORKSPACE_DIR, "node_modules", "@picocss", "pico", "css", "pico.classless.min.css"),
+}
+
 def get_tailwind_js():
     if os.path.exists(TAILWIND_CACHE_PATH):
         print(f"Loading Tailwind JS from local cache: {TAILWIND_CACHE_PATH}")
@@ -28,7 +41,6 @@ def get_tailwind_js():
         with urllib.request.urlopen(req) as response:
             code = response.read().decode("utf-8")
         
-        # Save to local cache
         os.makedirs(os.path.dirname(TAILWIND_CACHE_PATH), exist_ok=True)
         with open(TAILWIND_CACHE_PATH, "w", encoding="utf-8") as f:
             f.write(code)
@@ -38,50 +50,63 @@ def get_tailwind_js():
         print(f"Error fetching Tailwind JS: {e}")
         raise
 
+def load_lib(token, path):
+    if os.path.exists(path):
+        print(f"  Loading {token}: {os.path.basename(path)} ({os.path.getsize(path) // 1024}KB)")
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    else:
+        print(f"  WARNING: {token} not found at {path} — embedding empty stub")
+        return f"/* {token} not bundled — run npm install */\nconsole.warn('{token} not loaded');"
+
 def main():
     if not os.path.exists(TEMPLATE_PATH):
         print(f"Error: Template file not found at {TEMPLATE_PATH}")
         return
 
-    # Load Tailwind JS
     tailwind_js = get_tailwind_js()
 
-    # Load Prism CSS
     print(f"Reading Prism CSS: {PRISM_CSS_PATH}")
     with open(PRISM_CSS_PATH, "r", encoding="utf-8") as f:
         prism_css = f.read()
 
-    # Load Prism JS
     print(f"Reading Prism JS: {PRISM_JS_PATH}")
     with open(PRISM_JS_PATH, "r", encoding="utf-8") as f:
         prism_js = f.read()
 
-    # Load CodeJar JS and strip "export " prefix
     print(f"Reading CodeJar JS: {CODEJAR_JS_PATH}")
     with open(CODEJAR_JS_PATH, "r", encoding="utf-8") as f:
         codejar_js = f.read()
     codejar_js = codejar_js.replace("export function CodeJar", "function CodeJar")
 
-    # Read template source HTML
+    print("Loading offline library vault...")
+    libs = {}
+    for token, path in LIB_PATHS.items():
+        libs[token] = load_lib(token, path)
+
     print(f"Reading template: {TEMPLATE_PATH}")
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html_content = f.read()
 
-    # Perform inline replacements
-    print("Inlining dependencies...")
+    print("Inlining core dependencies...")
     html_content = html_content.replace("/* {{tailwind_js}} */", tailwind_js)
     html_content = html_content.replace("/* {{prism_css}} */", prism_css)
     html_content = html_content.replace("/* {{codejar_js}} */", codejar_js)
     html_content = html_content.replace("/* {{prism_js}} */", prism_js)
 
-    # Write output files
+    print("Inlining offline library vault...")
+    for token, content in libs.items():
+        placeholder = f"/* {{{{{token}}}}} */"
+        html_content = html_content.replace(placeholder, content)
+
     for path in [OUTPUT_PATH, OUTPUT_PATH_PUBLIC]:
         print(f"Writing compiled standalone IDE to: {path}")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-    print("Success! Standalone offline local-ide.html built successfully.")
+    total_size = os.path.getsize(OUTPUT_PATH)
+    print(f"Success! Standalone offline local-ide.html built — {total_size // 1024}KB total.")
 
 if __name__ == "__main__":
     main()
