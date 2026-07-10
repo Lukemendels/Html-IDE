@@ -27,8 +27,7 @@ import {
   Tablet,
   Smartphone,
   ExternalLink,
-  Zap,
-  Info
+  Zap
 } from 'lucide-react';
 
 export default function App() {
@@ -157,11 +156,8 @@ export default function App() {
 </html>`);
 
   const [currentFileName, setCurrentFileName] = useState<string>('pomodoro-clock.html');
-  const [librariesOpen, setLibrariesOpen] = useState<boolean>(true);
   const [aiDrawerOpen, setAiDrawerOpen] = useState<boolean>(false);
   const [aiPacket, setAiPacket] = useState<string>('');
-  const [selectedLibraries, setSelectedLibraries] = useState<string[]>(['tailwind']);
-  const [customLibraryText, setCustomLibraryText] = useState<string>('');
   const [previewMode, setPreviewMode] = useState<'full' | 'tablet' | 'mobile'>('full');
   
   // Status confirmations
@@ -392,56 +388,9 @@ export default function App() {
     }, 400);
   };
 
-  // Toggle individual library checkboxes
-  const handleToggleLibrary = (lib: string) => {
-    setSelectedLibraries(prev => {
-      if (prev.includes(lib)) {
-        return prev.filter(l => l !== lib);
-      } else {
-        return [...prev, lib];
-      }
-    });
-  };
-
-  // Compile final static file with all injected libraries and trigger client download
+  // Standalone File Export
   const handleDownloadCompletedTool = () => {
-    let injectionStr = '\n<!-- INJECTED LIBRARIES BY LOCAL HTML IDE -->\n';
-
-    selectedLibraries.forEach(lib => {
-      if (lib === 'tailwind') {
-        injectionStr += '<!-- Tailwind CSS v4 Browser Engine -->\n<script src="https://cdn.tailwindcss.com"></script>\n';
-      } else if (lib === 'alpine') {
-        injectionStr += '<!-- Alpine.js Declarative Framework -->\n<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>\n';
-      } else if (lib === 'fontawesome') {
-        injectionStr += '<!-- FontAwesome Icon Suite -->\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">\n';
-      } else if (lib === 'animatecss') {
-        injectionStr += '<!-- Animate.css Styles -->\n<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">\n';
-      } else if (lib === 'chartjs') {
-        injectionStr += '<!-- Chart.js Graphing API -->\n<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\n';
-      } else if (lib === 'sweetalert2') {
-        injectionStr += '<!-- SweetAlert2 Modal Engine -->\n<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>\n';
-      }
-    });
-
-    if (customLibraryText.trim()) {
-      injectionStr += `<!-- Custom User-Pasted Style/Script Injectables -->\n${customLibraryText.trim()}\n`;
-    }
-
-    injectionStr += '<!-- END OF INJECTED LIBRARIES -->\n';
-
-    let finalHTML = code;
-    const bodyCloseRegex = /<\/body>/i;
-    const headCloseRegex = /<\/head>/i;
-
-    if (bodyCloseRegex.test(finalHTML)) {
-      finalHTML = finalHTML.replace(bodyCloseRegex, match => injectionStr + match);
-    } else if (headCloseRegex.test(finalHTML)) {
-      finalHTML = finalHTML.replace(headCloseRegex, match => injectionStr + match);
-    } else {
-      finalHTML = finalHTML + injectionStr;
-    }
-
-    const blob = new Blob([finalHTML], { type: 'text/html;charset=utf-8' });
+    const blob = new Blob([code], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -594,123 +543,7 @@ REPLACE:
         {/* LEFT COLUMN: Editor & Control Decks */}
         <section className="w-1/2 flex flex-col bg-[#141417] border-r border-[#222227] h-full overflow-hidden">
           
-          {/* Deck A: Injectables configuration */}
-          <div className="p-4 bg-[#111113] border-b border-[#222227] space-y-3.5 shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1.5">
-                <span className="text-xs font-semibold text-gray-400 tracking-wider uppercase">Injectable Libraries</span>
-                <Info className="h-3 w-3 text-gray-500 cursor-help" title="These libraries will be bundled neatly inside your file right before download." />
-              </div>
-              <button 
-                onClick={() => setLibrariesOpen(!librariesOpen)}
-                className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center space-x-1 cursor-pointer"
-              >
-                <span>{librariesOpen ? 'Hide Panel' : 'Show Panel'}</span>
-                {librariesOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              </button>
-            </div>
 
-            <AnimatePresence initial={false}>
-              {librariesOpen && (
-                <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="space-y-3 overflow-hidden"
-                >
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <label className="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLibraries.includes('tailwind')}
-                        onChange={() => handleToggleLibrary('tailwind')}
-                        className="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer" 
-                      />
-                      <div className="text-[11px]">
-                        <div className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Tailwind CSS</div>
-                        <div className="text-gray-500 font-mono text-[9px]">v4 Browser Engine</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLibraries.includes('alpine')}
-                        onChange={() => handleToggleLibrary('alpine')}
-                        className="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer" 
-                      />
-                      <div className="text-[11px]">
-                        <div className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Alpine.js</div>
-                        <div className="text-gray-500 font-mono text-[9px]">Reactive Framework</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLibraries.includes('fontawesome')}
-                        onChange={() => handleToggleLibrary('fontawesome')}
-                        className="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer" 
-                      />
-                      <div className="text-[11px]">
-                        <div className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">FontAwesome</div>
-                        <div className="text-gray-500 font-mono text-[9px]">v6 Icon Suite</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLibraries.includes('animatecss')}
-                        onChange={() => handleToggleLibrary('animatecss')}
-                        className="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer" 
-                      />
-                      <div className="text-[11px]">
-                        <div className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Animate.css</div>
-                        <div className="text-gray-500 font-mono text-[9px]">Declarative FX</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLibraries.includes('chartjs')}
-                        onChange={() => handleToggleLibrary('chartjs')}
-                        className="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer" 
-                      />
-                      <div className="text-[11px]">
-                        <div className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">Chart.js</div>
-                        <div className="text-gray-500 font-mono text-[9px]">Interactive Graphs</div>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start space-x-2 bg-[#17171c] hover:bg-[#1f1f25] border border-[#23232c] p-2 rounded-lg cursor-pointer transition-all group">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedLibraries.includes('sweetalert2')}
-                        onChange={() => handleToggleLibrary('sweetalert2')}
-                        className="mt-0.5 rounded border-gray-700 text-blue-600 focus:ring-0 bg-gray-900 cursor-pointer" 
-                      />
-                      <div className="text-[11px]">
-                        <div className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">SweetAlert2</div>
-                        <div className="text-gray-500 font-mono text-[9px]">Modals Engine</div>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div>
-                    <span className="block text-[10px] text-gray-500 font-mono mb-1">Custom CDN Scripts / Stylesheet Embed:</span>
-                    <textarea 
-                      value={customLibraryText}
-                      onChange={(e) => setCustomLibraryText(e.target.value)}
-                      placeholder="e.g. <script src='https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js'></script>" 
-                      className="w-full h-14 bg-[#17171c] border border-gray-800 rounded-lg p-2 text-[10px] font-mono text-gray-400 focus:outline-none focus:border-blue-500/50 resize-none transition-all"
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
 
           {/* Deck B: CodeJar Text Editor Canvas */}
           <div className="flex-1 flex flex-col min-h-0 bg-[#16161a]">
