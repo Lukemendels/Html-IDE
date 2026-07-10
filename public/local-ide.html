@@ -3557,10 +3557,10 @@ Prism.languages.js = Prism.languages.javascript;
           const content = container.textContent;
           if (libId === 'lib-picocss') {
             const stemRegex = new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`, 'gi');
-            packedHtml = packedHtml.replace(stemRegex, `<style id="injected-${libId}">\n${content}\n</style>`);
+            packedHtml = packedHtml.replace(stemRegex, () => `<style id="injected-${libId}">\n${content}\n</style>`);
           } else {
             const stemRegex = new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`, 'gi');
-            packedHtml = packedHtml.replace(stemRegex, `<script id="injected-${libId}">\n${content}\n<\/script>`);
+            packedHtml = packedHtml.replace(stemRegex, () => `<script id="injected-${libId}">\n${content}\n<\/script>`);
           }
         }
       });
@@ -3769,10 +3769,10 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."
   <!-- STICKSHIFT_JS_END -->`;
 
       // Inject CSS into <head>
-      html = html.replace(/(<\/head>)/i, ssCSS + '\n$1');
+      html = html.replace(/(<\/head>)/i, (match) => ssCSS + '\n' + match);
 
       // Inject trigger button + panel + skill + JS before </body>
-      html = html.replace(/(<\/body>)/i, ssTrigger + '\n' + ssPanel + '\n' + ssSkill + '\n' + ssJS + '\n$1');
+      html = html.replace(/(<\/body>)/i, (match) => ssTrigger + '\n' + ssPanel + '\n' + ssSkill + '\n' + ssJS + '\n' + match);
 
       return html;
     }
