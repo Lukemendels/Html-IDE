@@ -216,94 +216,154 @@
 
         <!-- Drawer Content -->
         <div id="libPackerContent" class="overflow-hidden transition-all duration-300" style="max-height:0">
-          <div class="px-4 pb-4 space-y-3">
+          <div class="px-4 pb-4 space-y-4">
 
-            <!-- Utility Row -->
-            <div class="flex items-center justify-between pt-1">
-              <span class="text-[9px] text-gray-500 font-mono uppercase tracking-widest">Selected libs inject on download</span>
-              <div class="flex items-center space-x-2">
-                <button id="libSelectAll" class="text-[9px] text-emerald-400 hover:text-emerald-300 cursor-pointer transition-colors">Select All</button>
-                <span class="text-gray-600 text-[9px]">|</span>
-                <button id="libClearAll" class="text-[9px] text-gray-400 hover:text-gray-200 cursor-pointer transition-colors">Clear All</button>
-              </div>
+            <!-- Information Row -->
+            <div class="pt-1">
+              <p class="text-[8.5px] text-gray-500 font-mono leading-relaxed">
+                Libraries are declared directly inside the HTML using Stem tags. Click <span class="text-emerald-400 font-bold">+ Stem</span> to copy a tag, then paste it in your HTML. On download/preview, they are automatically packed offline.
+              </p>
             </div>
 
             <!-- Group: Core UI & Reactivity -->
             <div class="space-y-1.5">
               <div class="text-[9px] text-emerald-500/70 font-semibold uppercase tracking-widest pb-1 border-b border-[#222227]">Core UI &amp; Reactivity</div>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-alpine" data-lib="lib-alpine" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">Alpine.js</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">Reactive micro-framework · ~45KB</p>
+              
+              <!-- Alpine.js -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-alpine" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">Alpine.js</div>
+                    <div class="text-[8px] text-gray-500 font-mono">Reactive micro-framework · ~45KB</div>
+                  </div>
                 </div>
-              </label>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-picocss" data-lib="lib-picocss" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">Pico.css</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">Classless dark/light CSS · ~70KB</p>
+                <button onclick="copyStemTag(this, 'lib-alpine')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
+
+              <!-- Pico.css -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-picocss" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">Pico.css</div>
+                    <div class="text-[8px] text-gray-500 font-mono">Classless CSS styling · ~70KB</div>
+                  </div>
                 </div>
-              </label>
+                <button onclick="copyStemTag(this, 'lib-picocss')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
             </div>
 
             <!-- Group: Word & Text Extractors -->
             <div class="space-y-1.5">
               <div class="text-[9px] text-blue-500/70 font-semibold uppercase tracking-widest pb-1 border-b border-[#222227]">Word &amp; Text Extractors</div>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-jszip" data-lib="lib-jszip" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">JSZip</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">OpenXML zip utility · ~95KB</p>
+              
+              <!-- JSZip -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-jszip" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">JSZip</div>
+                    <div class="text-[8px] text-gray-500 font-mono">OpenXML zip utility · ~95KB</div>
+                  </div>
                 </div>
-              </label>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-docxtemplater" data-lib="lib-docxtemplater" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">docxtemplater</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">Word template &amp; merge engine · ~100KB</p>
+                <button onclick="copyStemTag(this, 'lib-jszip')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
+
+              <!-- docxtemplater -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-docxtemplater" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">docxtemplater</div>
+                    <div class="text-[8px] text-gray-500 font-mono">Template &amp; merge engine · ~100KB</div>
+                  </div>
                 </div>
-              </label>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-docx" data-lib="lib-docx" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">docx</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">Generate .docx from scratch · ~1.1MB</p>
+                <button onclick="copyStemTag(this, 'lib-docxtemplater')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
+
+              <!-- docx -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-docx" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">docx</div>
+                    <div class="text-[8px] text-gray-500 font-mono">Gen .docx from scratch · ~1.1MB</div>
+                  </div>
                 </div>
-              </label>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-mammoth" data-lib="lib-mammoth" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">Mammoth.js</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">Docx → plain text extractor · ~620KB</p>
+                <button onclick="copyStemTag(this, 'lib-docx')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
+
+              <!-- Mammoth.js -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-mammoth" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">Mammoth.js</div>
+                    <div class="text-[8px] text-gray-500 font-mono">Docx to plain text · ~620KB</div>
+                  </div>
                 </div>
-              </label>
+                <button onclick="copyStemTag(this, 'lib-mammoth')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
             </div>
 
             <!-- Group: Data & Slides -->
             <div class="space-y-1.5">
               <div class="text-[9px] text-amber-500/70 font-semibold uppercase tracking-widest pb-1 border-b border-[#222227]">Data &amp; Slides</div>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-sheetjs" data-lib="lib-sheetjs" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">SheetJS (xlsx)</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">Excel parse &amp; workbook gen · ~860KB</p>
+              
+              <!-- SheetJS -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-sheetjs" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">SheetJS (xlsx)</div>
+                    <div class="text-[8px] text-gray-500 font-mono">Excel read &amp; write · ~860KB</div>
+                  </div>
                 </div>
-              </label>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-pptxgen" data-lib="lib-pptxgen" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">PptxGenJS</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">PowerPoint slide deck engine · ~450KB</p>
+                <button onclick="copyStemTag(this, 'lib-sheetjs')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
+
+              <!-- PptxGenJS -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-pptxgen" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">PptxGenJS</div>
+                    <div class="text-[8px] text-gray-500 font-mono">PowerPoint slide generator · ~450KB</div>
+                  </div>
                 </div>
-              </label>
-              <label class="lib-checkbox-row flex items-center space-x-3 cursor-pointer group">
-                <input type="checkbox" id="chk-pdfjs" data-lib="lib-pdfjs" class="lib-chk accent-emerald-500 cursor-pointer">
-                <div class="flex-1 min-w-0">
-                  <span class="text-[10px] font-semibold text-gray-200 group-hover:text-white transition-colors">PDF.js</span>
-                  <p class="text-[8.5px] text-gray-500 font-mono">PDF text extractor (mjs bundle) · ~440KB</p>
+                <button onclick="copyStemTag(this, 'lib-pptxgen')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
+
+              <!-- PDF.js -->
+              <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span id="dot-pdfjs" class="lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0"></span>
+                  <div class="min-w-0">
+                    <div class="text-[10px] font-semibold text-gray-200">PDF.js</div>
+                    <div class="text-[8px] text-gray-500 font-mono">PDF text extraction · ~440KB</div>
+                  </div>
                 </div>
-              </label>
+                <button onclick="copyStemTag(this, 'lib-pdfjs')" class="text-[9px] bg-[#1d1d24] hover:bg-[#252530] text-gray-400 hover:text-white px-2 py-0.5 rounded border border-[#2d2d3d] font-mono cursor-pointer transition-colors" title="Click to copy stem tag">
+                  + Stem
+                </button>
+              </div>
             </div>
 
           </div>
@@ -469,7 +529,7 @@
 okf_version: "0.1"
 type: Skill
 title: Local HTML IDE Code Updater
-description: Modify, edit, or refactor HTML, CSS, and JS code in the Local HTML IDE workspace using SEARCH/REPLACE update packets.
+description: Modify, edit, or refactor HTML, CSS, and JS code in the Local HTML IDE workspace using SEARCH/REPLACE update packets and offline library stem tags.
 tags: [skill, html-tool, code-editor]
 ---
 
@@ -477,6 +537,20 @@ tags: [skill, html-tool, code-editor]
 
 ## Purpose
 Use this skill when you want to modify, add, or delete code inside the active HTML editor workspace of the Local HTML IDE. 
+
+## Available Offline Libraries
+The IDE contains preloaded offline library assets. You can inject them instantly into your HTML code by simply writing their corresponding **Stem Tags** anywhere inside the editor code:
+- **Alpine.js**: `<script id="lib-alpine-stem"><\/script>` (Reactive micro-framework)
+- **Pico.css**: `<link rel="stylesheet" id="lib-picocss-stem">` (Classless semantic dark/light styling)
+- **JSZip**: `<script id="lib-jszip-stem"><\/script>` (Zip reader/writer)
+- **docxtemplater**: `<script id="lib-docxtemplater-stem"><\/script>` (Word document generation templates)
+- **docx**: `<script id="lib-docx-stem"><\/script>` (Gen Word documents from scratch)
+- **Mammoth.js**: `<script id="lib-mammoth-stem"><\/script>` (Docx plain text extractor)
+- **SheetJS (xlsx)**: `<script id="lib-sheetjs-stem"><\/script>` (Excel parse & workbook builder)
+- **PptxGenJS**: `<script id="lib-pptxgen-stem"><\/script>` (PowerPoint slide generator)
+- **PDF.js**: `<script id="lib-pdfjs-stem"><\/script>` (PDF text extractor)
+
+*IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag. The compilation packer will automatically inline the full library code on preview or download.
 
 ## How the Agent Edits Code
 To edit code in the IDE, you must generate one or more code modification blocks using a strict `SEARCH:` and `REPLACE:` format. The user will copy-paste this block into the AI Update Drawer to apply the changes.
@@ -722,6 +796,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       state.code = newCode;
       syncLineNumbers();
       triggerLivePreview();
+      syncLibraryIndicators();
     });
 
     // Synchronize Scroll between codejar text and line number gutter
@@ -745,7 +820,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function triggerLivePreview() {
       clearTimeout(renderDebounceTimer);
       renderDebounceTimer = setTimeout(() => {
-        elements.previewFrame.srcdoc = state.code;
+        elements.previewFrame.srcdoc = packLibraries(state.code);
       }, 250);
     }
 
@@ -884,16 +959,125 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
 
       const reader = new FileReader();
       reader.onload = (evt) => {
-        const loadedCode = evt.target.result;
+        let loadedCode = evt.target.result;
+        loadedCode = unpackInlinedLibraries(loadedCode);
         state.code = loadedCode;
         jar.updateCode(loadedCode);
         state.currentFileName = file.name;
         elements.currentFileName.textContent = file.name;
         syncLineNumbers();
         triggerLivePreview();
+        syncLibraryIndicators();
       };
       reader.readAsText(file);
     });
+
+    // Unpack Inlined Libraries from code to stems
+    function unpackInlinedLibraries(html) {
+      let cleanedHtml = html;
+      
+      // Replace injected library script blocks with their stems
+      cleanedHtml = cleanedHtml.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi, (match, libId) => {
+        return `<script id="${libId}-stem"><\/script>`;
+      });
+      
+      // Replace injected library stylesheet blocks with their stems
+      cleanedHtml = cleanedHtml.replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi, (match, libId) => {
+        return `<link rel="stylesheet" id="${libId}-stem">`;
+      });
+
+      // Strip injected StickShift compliance blocks to keep editor clean
+      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_CSS_START -->[\s\S]*?<!-- STICKSHIFT_CSS_END -->/gi, '');
+      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_TRIGGER_START -->[\s\S]*?<!-- STICKSHIFT_TRIGGER_END -->/gi, '');
+      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_PANEL_START -->[\s\S]*?<!-- STICKSHIFT_PANEL_END -->/gi, '');
+      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/gi, '');
+      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_JS_START -->[\s\S]*?<!-- STICKSHIFT_JS_END -->/gi, '');
+
+      return cleanedHtml;
+    }
+
+    // Pack Libraries: replaces stems with full inlined library content
+    function packLibraries(html) {
+      let packedHtml = html;
+      
+      const libIds = [
+        'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater', 
+        'lib-docx', 'lib-mammoth', 'lib-sheetjs', 'lib-pptxgen', 'lib-pdfjs'
+      ];
+      
+      libIds.forEach(libId => {
+        const container = document.getElementById(libId);
+        if (container) {
+          const content = container.textContent;
+          if (libId === 'lib-picocss') {
+            const stemRegex = new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`, 'gi');
+            packedHtml = packedHtml.replace(stemRegex, `<style id="injected-${libId}">\n${content}\n</style>`);
+          } else {
+            const stemRegex = new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`, 'gi');
+            packedHtml = packedHtml.replace(stemRegex, `<script id="injected-${libId}">\n${content}\n<\/script>`);
+          }
+        }
+      });
+      
+      return packedHtml;
+    }
+
+    // Sync Library Indicators on UI Accordion
+    function syncLibraryIndicators() {
+      const code = state.code;
+      const libIds = [
+        'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater', 
+        'lib-docx', 'lib-mammoth', 'lib-sheetjs', 'lib-pptxgen', 'lib-pdfjs'
+      ];
+      
+      let activeCount = 0;
+      libIds.forEach(libId => {
+        const hasStem = code.includes(`id="${libId}-stem"`);
+        const dot = document.getElementById(`dot-${libId.replace('lib-', '')}`);
+        const row = dot ? dot.closest('.lib-row') : null;
+        
+        if (dot) {
+          if (hasStem) {
+            dot.className = "lib-status-dot h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-lg shadow-emerald-500/50";
+            if (row) {
+              row.classList.add('border-emerald-500/30', 'bg-emerald-500/5');
+              row.classList.remove('border-[#222227]', 'bg-[#141417]/50');
+            }
+            activeCount++;
+          } else {
+            dot.className = "lib-status-dot h-1.5 w-1.5 rounded-full bg-gray-600 shrink-0";
+            if (row) {
+              row.classList.remove('border-emerald-500/30', 'bg-emerald-500/5');
+              row.classList.add('border-[#222227]', 'bg-[#141417]/50');
+            }
+          }
+        }
+      });
+      
+      if (activeCount > 0) {
+        elements.libPackerCount.textContent = `${activeCount} active`;
+        elements.libPackerCount.classList.remove('hidden');
+      } else {
+        elements.libPackerCount.classList.add('hidden');
+      }
+    }
+
+    // Copy Stem Tag Helper Exposed on Window
+    window.copyStemTag = function(buttonEl, libId) {
+      const stem = libId === 'lib-picocss' 
+        ? `<link rel="stylesheet" id="${libId}-stem">`
+        : `<script id="${libId}-stem"><\/script>`;
+        
+      copyText(stem).then(() => {
+        const origText = buttonEl.textContent;
+        buttonEl.textContent = 'Copied!';
+        buttonEl.classList.add('text-green-400', 'border-green-500/30');
+        setTimeout(() => {
+          buttonEl.textContent = origText;
+          buttonEl.classList.remove('text-green-400', 'border-green-500/30');
+        }, 1500);
+      });
+    };
 
     // Standalone File Export
     // Inject StickShift compliance components into the output HTML if not already present
@@ -907,6 +1091,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
 
       // --- CSS ---
       const ssCSS = `
+  <!-- STICKSHIFT_CSS_START -->
   <!-- StickShift Compliance Styles -->
   <style>
     .ss-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s ease}
@@ -915,18 +1100,22 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     .ss-overlay.active .ss-card{transform:scale(1)}
     #ss-trigger{position:fixed;bottom:1.25rem;right:1.25rem;z-index:9998;display:flex;align-items:center;gap:.5rem;background:linear-gradient(to right,#7c3aed,#6d28d9);color:#fff;font-size:.7rem;font-weight:600;padding:.5rem 1rem;border-radius:.5rem;border:1px solid rgba(167,139,250,.2);box-shadow:0 4px 14px rgba(124,58,237,.25);cursor:pointer;letter-spacing:.03em;transition:all .2s}
     #ss-trigger:hover{background:linear-gradient(to right,#6d28d9,#5b21b6);box-shadow:0 6px 20px rgba(124,58,237,.35)}
-  </style>`;
+  </style>
+  <!-- STICKSHIFT_CSS_END -->`;
 
       // --- Floating trigger button (non-invasive, doesn't touch existing UI) ---
       const ssTrigger = `
+  <!-- STICKSHIFT_TRIGGER_START -->
   <!-- StickShift Setup Trigger -->
   <button id="ss-trigger" onclick="document.getElementById('ss-panel').classList.add('active')">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m12 8-4 4h8z"/></svg>
     StickShift
-  </button>`;
+  </button>
+  <!-- STICKSHIFT_TRIGGER_END -->`;
 
       // --- Onboarding panel ---
       const ssPanel = `
+  <!-- STICKSHIFT_PANEL_START -->
   <!-- StickShift Compliance Onboarding Panel -->
   <div id="ss-panel" class="ss-overlay" onclick="if(event.target===this)this.classList.remove('active')">
     <div class="ss-card" style="color:#e5e7eb">
@@ -954,17 +1143,19 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
         <p style="color:#9ca3af;font-size:.625rem;margin:0">Your LLM agent can now open this tool directly from the StickShift cockpit using the companion skill.</p>
       </div>
     </div>
-  </div>`;
+  </div>
+  <!-- STICKSHIFT_PANEL_END -->`;
 
       // --- Embedded skill markdown ---
       const ssSkill = `
+  <!-- STICKSHIFT_SKILL_START -->
   <!-- StickShift Embedded Companion Skill -->
   <script type="text/markdown" id="stickshift-skill" data-skill-slug="${skillSlug}">
 ---
 okf_version: "0.1"
 type: Skill
 title: ${toolTitle} Code Updater
-description: Modify, edit, or refactor code in the ${toolTitle} HTML tool using SEARCH/REPLACE update packets.
+description: Modify, edit, or refactor code in the ${toolTitle} HTML tool using SEARCH/REPLACE update packets and offline library stem tags.
 tags: [skill, html-tool, code-editor]
 ---
 
@@ -972,6 +1163,20 @@ tags: [skill, html-tool, code-editor]
 
 ## Purpose
 Use this skill to modify code inside the active ${toolTitle} HTML tool.
+
+## Available Offline Libraries
+The tool workspace supports offline library stems. You can request any of these libraries to be packed by simply writing its Stem Tag in the HTML:
+- Alpine.js: <script id="lib-alpine-stem"><\/script>
+- Pico.css: <link rel="stylesheet" id="lib-picocss-stem">
+- JSZip: <script id="lib-jszip-stem"><\/script>
+- docxtemplater: <script id="lib-docxtemplater-stem"><\/script>
+- docx: <script id="lib-docx-stem"><\/script>
+- Mammoth.js: <script id="lib-mammoth-stem"><\/script>
+- SheetJS (xlsx): <script id="lib-sheetjs-stem"><\/script>
+- PptxGenJS: <script id="lib-pptxgen-stem"><\/script>
+- PDF.js: <script id="lib-pdfjs-stem"><\/script>
+
+*IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag.
 
 ## How the Agent Edits Code
 Generate one or more SEARCH/REPLACE blocks. The user pastes them into the AI Update Drawer.
@@ -995,10 +1200,12 @@ include:
 </HTML_OPEN>
 
 Instruction: "Copy the block above and click Open HTML Tool in StickShift."
-  <\/script>`;
+  <\/script>
+  <!-- STICKSHIFT_SKILL_END -->`;
 
       // --- JS event wiring (self-contained, no dependency on elements object) ---
       const ssJS = `
+  <!-- STICKSHIFT_JS_START -->
   <!-- StickShift Runtime Init -->
   <script>
   (function(){
@@ -1012,7 +1219,8 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."
       }
     });
   })();
-  <\/script>`;
+  <\/script>
+  <!-- STICKSHIFT_JS_END -->`;
 
       // Inject CSS into <head>
       html = html.replace(/(<\/head>)/i, ssCSS + '\n$1');
@@ -1042,67 +1250,12 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."
       }
     }
 
-    function updateSelectedLibsCount() {
-      const chks = document.querySelectorAll('.lib-chk:checked');
-      const count = chks.length;
-      if (count > 0) {
-        elements.libPackerCount.textContent = `${count} selected`;
-        elements.libPackerCount.classList.remove('hidden');
-      } else {
-        elements.libPackerCount.classList.add('hidden');
-      }
-    }
-
-    document.querySelectorAll('.lib-chk').forEach(chk => {
-      chk.addEventListener('change', updateSelectedLibsCount);
-    });
-
-    elements.libSelectAll.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelectorAll('.lib-chk').forEach(chk => {
-        chk.checked = true;
-      });
-      updateSelectedLibsCount();
-    });
-
-    elements.libClearAll.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.querySelectorAll('.lib-chk').forEach(chk => {
-        chk.checked = false;
-      });
-      updateSelectedLibsCount();
-    });
-
     // Initialize Collapsible state for libraries
     elements.libPackerContent.style.maxHeight = '0px';
 
     elements.downloadBtn.addEventListener('click', () => {
-      let finalCode = state.code;
-      const injectedScripts = [];
-      const injectedStyles = [];
-      
-      const libCheckboxes = document.querySelectorAll('.lib-chk');
-      libCheckboxes.forEach(chk => {
-        if (chk.checked) {
-          const libId = chk.dataset.lib;
-          const container = document.getElementById(libId);
-          if (container) {
-            const content = container.textContent;
-            if (libId === 'lib-picocss') {
-              injectedStyles.push(`  <!-- Injected ${libId} Stylesheet -->\n  <style>\n${content}\n  </style>`);
-            } else {
-              injectedScripts.push(`  <!-- Injected ${libId} Library -->\n  <script>\n${content}\n  <\/script>`);
-            }
-          }
-        }
-      });
-      
-      if (injectedStyles.length > 0) {
-        finalCode = finalCode.replace(/(<\/head>)/i, injectedStyles.join('\n') + '\n$1');
-      }
-      if (injectedScripts.length > 0) {
-        finalCode = finalCode.replace(/(<\/body>)/i, injectedScripts.join('\n') + '\n$1');
-      }
+      // Pack the editor's code directly based on the stems present
+      let finalCode = packLibraries(state.code);
 
       const fileName = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
       finalCode = injectStickShiftCompliance(finalCode, fileName);
