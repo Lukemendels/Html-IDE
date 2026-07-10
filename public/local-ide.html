@@ -161,6 +161,39 @@ Check your Browserslist config to be sure that your targets are set up correctly
       box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
       border-color: rgba(168, 85, 247, 0.4);
     }
+
+    /* StickShift compliance onboarding panel styling */
+    .ss-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .ss-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .ss-card {
+      background: #141417;
+      border: 1px solid #222227;
+      border-radius: 1rem;
+      width: 100%;
+      max-width: 32rem;
+      padding: 1.5rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      transform: scale(0.95);
+      transition: transform 0.3s ease;
+    }
+    .ss-overlay.active .ss-card {
+      transform: scale(1);
+    }
   </style>
 </head>
 <body class="h-full overflow-hidden flex flex-col select-none">
@@ -198,6 +231,11 @@ Check your Browserslist config to be sure that your targets are set up correctly
       <button id="downloadBtn" class="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-lg shadow-blue-500/10 border border-blue-400/20 cursor-pointer transition-all">
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
         <span>Download Completed Tool</span>
+      </button>
+
+      <button id="ss-open" class="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-lg shadow-purple-500/10 border border-purple-400/20 cursor-pointer transition-all">
+        <svg class="w-3.5 h-3.5 text-purple-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m12 8-4 4h8z"/></svg>
+        <span>Set up with StickShift</span>
       </button>
     </div>
   </header>
@@ -326,8 +364,138 @@ Check your Browserslist config to be sure that your targets are set up correctly
 
   </main>
 
+
+  <!-- StickShift Compliance Onboarding Panel Overlay -->
+  <div id="ss-panel" class="ss-overlay">
+    <div class="ss-card text-gray-200">
+      <!-- Title Header -->
+      <div class="flex items-center justify-between border-b border-[#222227] pb-4 mb-4">
+        <div class="flex items-center space-x-2.5">
+          <div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-purple-600 to-purple-500 flex items-center justify-center p-1.5 shadow-lg shadow-purple-500/10">
+            <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m12 8-4 4h8z"/></svg>
+          </div>
+          <div>
+            <h2 class="text-xs font-bold text-white leading-tight">StickShift Onboarding Panel</h2>
+            <p class="text-[9px] text-gray-500 font-mono">Cockpit installation standard</p>
+          </div>
+        </div>
+        <button id="ss-close" class="text-gray-400 hover:text-white transition-colors cursor-pointer focus:outline-none">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Compliance Statement -->
+      <div class="mb-4 bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 text-[10px] text-blue-400 flex items-start space-x-2.5">
+        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span><strong>Client-Side I/O Compliance:</strong> All code compiling, rendering, and downloading occurs 100% locally on your machine. Absolutely zero network requests are made.</span>
+      </div>
+
+      <!-- Mode Selector Tabs -->
+      <div class="flex border-b border-[#222227] mb-4">
+        <button id="ss-tab-yes" class="flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none">Yes, I use StickShift</button>
+        <button id="ss-tab-no" class="flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none">No, standalone mode</button>
+      </div>
+
+      <!-- Branch A: Yes, I use StickShift -->
+      <div id="ss-content-yes" class="space-y-3.5 text-[11px] text-gray-300">
+        <div class="space-y-1">
+          <span class="block font-semibold text-white">Step 1: Save the File</span>
+          <p class="text-gray-400 text-[10px]">Download this file and rename it exactly to <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">local-ide.html</code>.</p>
+        </div>
+        <div class="space-y-2">
+          <span class="block font-semibold text-white">Step 2: Install the Companion Skill</span>
+          <p class="text-gray-400 text-[10px]">Copy the companion skill markdown configuration and save it into your StickShift installation directory as <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">skills/local-html-ide.md</code>.</p>
+          <button id="ss-copy-skill" class="w-full flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 rounded-lg transition-all cursor-pointer shadow-lg shadow-purple-500/15 text-[11px] focus:outline-none">
+            <svg id="ss-copy-icon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            <svg id="ss-check-icon" class="w-3.5 h-3.5 hidden text-green-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="ss-copy-text">Copy Companion Skill Markdown</span>
+          </button>
+        </div>
+        <div class="space-y-1">
+          <span class="block font-semibold text-white">Step 3: Access via Cockpit</span>
+          <p class="text-gray-400 text-[10px]">Your LLM agent can now open and control this workspace tool directly inside your StickShift environment.</p>
+        </div>
+      </div>
+
+      <!-- Branch B: No, standalone mode -->
+      <div id="ss-content-no" class="hidden space-y-3.5 text-[11px] text-gray-300">
+        <div class="space-y-1">
+          <span class="block font-semibold text-white">Run 100% Standalone Offline</span>
+          <p class="text-gray-400 text-[10px] leading-relaxed">You do not need any hosting environment. Simply double-click the downloaded file in your local directory (opening it via the <code class="font-mono text-blue-400">file://</code> protocol) or drag it into any web browser. The tool works fully offline without any server configurations.</p>
+        </div>
+        <div class="space-y-1">
+          <span class="block font-semibold text-white">Export Work</span>
+          <p class="text-gray-400 text-[10px] leading-relaxed">Write or modify your HTML/CSS/JavaScript inside the editor. Review it in the real-time preview canvas, and click <strong>Download Completed Tool</strong> to save the work directly as a single compiled HTML tool back to your computer.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Embedded StickShift Companion Skill Markup -->
+  <script type="text/markdown" id="stickshift-skill" data-skill-slug="local-html-ide">
+---
+okf_version: "0.1"
+type: Skill
+title: Local HTML IDE Code Updater
+description: Modify, edit, or refactor HTML, CSS, and JS code in the Local HTML IDE workspace using SEARCH/REPLACE update packets.
+tags: [skill, html-tool, code-editor]
+---
+
+# local-html-ide
+
+## Purpose
+Use this skill when you want to modify, add, or delete code inside the active HTML editor workspace of the Local HTML IDE. 
+
+## How the Agent Edits Code
+To edit code in the IDE, you must generate one or more code modification blocks using a strict `SEARCH:` and `REPLACE:` format. The user will copy-paste this block into the AI Update Drawer to apply the changes.
+
+### AI Update Packet Format
+Write your modification block exactly like this:
+
+SEARCH:
+[Paste the exact code block currently in the editor that you want to change]
+REPLACE:
+[Paste the new replacement code block]
+
+### Rules for Generating Packets:
+1. **Exact Matches**: The code under `SEARCH:` must match the code in the editor exactly, including whitespace, comments, and empty lines.
+2. **Context**: Include 2-3 lines of surrounding code under `SEARCH:` to help the parser locate unique sections.
+3. **Multiple Replacements**: You can stack multiple blocks in a single response to apply multiple modifications:
+   
+   SEARCH:
+   [first search block]
+   REPLACE:
+   [first replace block]
+   
+   SEARCH:
+   [second search block]
+   REPLACE:
+   [second replace block]
+
+## How to open the tool
+A local HTML tool cannot be opened from a chat hyperlink. Give the operator this block verbatim, then one instruction line, and nothing else:
+
+<HTML_OPEN>
+tool: local-ide.html
+include:
+- skills/local-html-ide.md
+</HTML_OPEN>
+
+Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
+  </script>
+
   <!-- CUSTOM SCRIPTS INTEGRATING CLIENT LOGIC -->
   <script>
+    // StickShift Tool Identity Declaration
+    const STICKSHIFT_TOOL = {
+      file: "local-ide.html",
+      skillSlug: "local-html-ide",
+      title: "Local HTML IDE"
+    };
+    window.addEventListener('error', (event) => {
+      console.error('WINDOW ERROR:', event.error.stack || event.error.message || event.error);
+    });
+    try {
     // Inlined CodeJar and Prism JS Libraries (Offline Bundled)
     const globalWindow = window;
 function CodeJar(editor, highlight, opt = {}) {
@@ -2946,7 +3114,15 @@ Prism.languages.js = Prism.languages.javascript;
       aiDrawerIcon: document.getElementById('aiDrawerIcon'),
       iframeContainer: document.getElementById('iframeContainer'),
       resBtns: document.querySelectorAll('.res-btn'),
-      refreshIcon: document.getElementById('refreshIcon')
+      refreshIcon: document.getElementById('refreshIcon'),
+      ssOpen: document.getElementById('ss-open'),
+      ssClose: document.getElementById('ss-close'),
+      ssPanel: document.getElementById('ss-panel'),
+      ssTabYes: document.getElementById('ss-tab-yes'),
+      ssTabNo: document.getElementById('ss-tab-no'),
+      ssContentYes: document.getElementById('ss-content-yes'),
+      ssContentNo: document.getElementById('ss-content-no'),
+      ssCopySkill: document.getElementById('ss-copy-skill')
     };
 
     // Initialize CodeJar Editor
@@ -3024,9 +3200,36 @@ Prism.languages.js = Prism.languages.javascript;
       });
     });
 
+    // Robust clipboard copy with legacy fallback for file:// protocol compliance
+    function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+      } else {
+        return legacyCopy(text);
+      }
+    }
+    function legacyCopy(text) {
+      return new Promise((resolve, reject) => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try {
+          const successful = document.execCommand('copy');
+          if (successful) resolve();
+          else reject(new Error('Copy command failed'));
+        } catch (e) {
+          reject(e);
+        }
+        document.body.removeChild(ta);
+      });
+    }
+
     // Copy Current Editor Source
     elements.copyCodeBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(state.code).then(() => {
+      copyText(state.code).then(() => {
         const copyIcon = document.getElementById('copyIcon');
         const checkIcon = document.getElementById('checkIcon');
         copyIcon.classList.add('hidden');
@@ -3311,6 +3514,61 @@ REPLACE:
       }
     });
 
+    // StickShift Setup Panel Actions
+    elements.ssOpen.addEventListener('click', () => {
+      elements.ssPanel.classList.add('active');
+    });
+    
+    elements.ssClose.addEventListener('click', () => {
+      elements.ssPanel.classList.remove('active');
+    });
+
+    // Close on overlay backdrop click
+    elements.ssPanel.addEventListener('click', (e) => {
+      if (e.target === elements.ssPanel) {
+        elements.ssPanel.classList.remove('active');
+      }
+    });
+
+    // Onboarding Panel Tabs Toggle
+    elements.ssTabYes.addEventListener('click', () => {
+      elements.ssTabYes.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none";
+      elements.ssTabNo.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none";
+      elements.ssContentYes.classList.remove('hidden');
+      elements.ssContentNo.classList.add('hidden');
+    });
+
+    elements.ssTabNo.addEventListener('click', () => {
+      elements.ssTabNo.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none";
+      elements.ssTabYes.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none";
+      elements.ssContentNo.classList.remove('hidden');
+      elements.ssContentYes.classList.add('hidden');
+    });
+
+    // Copy Companion Skill Code
+    elements.ssCopySkill.addEventListener('click', () => {
+      const skillText = document.getElementById('stickshift-skill').innerHTML;
+      copyText(skillText).then(() => {
+        const copyIcon = document.getElementById('ss-copy-icon');
+        const checkIcon = document.getElementById('ss-check-icon');
+        const copyTextSpan = document.getElementById('ss-copy-text');
+        
+        copyIcon.classList.add('hidden');
+        checkIcon.classList.remove('hidden');
+        copyTextSpan.textContent = 'Copied!';
+        
+        setTimeout(() => {
+          copyIcon.classList.remove('hidden');
+          checkIcon.classList.add('hidden');
+          copyTextSpan.textContent = 'Copy Companion Skill Markdown';
+        }, 2000);
+      });
+    });
+
+    } catch (err) {
+      console.error('CRITICAL INITIALIZATION ERROR:', err.stack || err);
+    }
   </script>
+
 </body>
 </html>
