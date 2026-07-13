@@ -976,6 +976,10 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function unpackInlinedLibraries(html) {
       let cleanedHtml = html;
       
+      // Strip injected PDF.js worker and setup script blocks to keep editor clean
+      cleanedHtml = cleanedHtml.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>([\s\S]*?)<\/script>/gi, '');
+      cleanedHtml = cleanedHtml.replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>([\s\S]*?)<\/script>/gi, '');
+
       // Replace injected library script blocks with their stems
       cleanedHtml = cleanedHtml.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi, (match, libId) => {
         return `<script id="${libId}-stem"><\/script>`;
@@ -1012,6 +1016,22 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
           if (libId === 'lib-picocss') {
             const stemRegex = new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`, 'gi');
             packedHtml = packedHtml.replace(stemRegex, () => `<style id="injected-${libId}">\n${content}\n</style>`);
+          } else if (libId === 'lib-pdfjs') {
+            const stemRegex = new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`, 'gi');
+            const workerContainer = document.getElementById('lib-pdfjs-worker');
+            const workerContent = workerContainer ? workerContainer.textContent : '';
+            
+            packedHtml = packedHtml.replace(stemRegex, () => {
+              return `<script id="injected-${libId}">\n${content}\n<\/script>\n` +
+                     `<script id="injected-${libId}-worker" type="text/plain">\n${workerContent}\n<\/script>\n` +
+                     `<script id="injected-${libId}-setup">\n` +
+                     `if (typeof window !== 'undefined' && window.pdfjsLib) {\n` +
+                     `  const workerContent = document.getElementById('injected-${libId}-worker').textContent;\n` +
+                     `  const blob = new Blob([workerContent], { type: 'text/javascript' });\n` +
+                     `  window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);\n` +
+                     `}\n` +
+                     `<\/script>`;
+            });
           } else {
             const stemRegex = new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`, 'gi');
             packedHtml = packedHtml.replace(stemRegex, () => `<script id="injected-${libId}">\n${content}\n<\/script>`);
@@ -1523,6 +1543,7 @@ REPLACE:
   <script type="text/plain" id="lib-sheetjs">/* {{lib_sheetjs}} */</script>
   <script type="text/plain" id="lib-pptxgen">/* {{lib_pptxgen}} */</script>
   <script type="text/plain" id="lib-pdfjs">/* {{lib_pdfjs}} */</script>
+  <script type="text/plain" id="lib-pdfjs-worker">/* {{lib_pdfjs_worker}} */</script>
   <script type="text/plain" id="lib-alpine">/* {{lib_alpine}} */</script>
   <style type="text/plain" id="lib-picocss">/* {{lib_picocss}} */</style>
 

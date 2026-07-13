@@ -20,7 +20,8 @@ LIB_PATHS = {
     "lib_mammoth":       os.path.join(WORKSPACE_DIR, "node_modules", "mammoth", "mammoth.browser.min.js"),
     "lib_sheetjs":       os.path.join(WORKSPACE_DIR, "node_modules", "xlsx", "dist", "xlsx.full.min.js"),
     "lib_pptxgen":       os.path.join(WORKSPACE_DIR, "node_modules", "pptxgenjs", "dist", "pptxgen.bundle.js"),
-    "lib_pdfjs":         os.path.join(WORKSPACE_DIR, "node_modules", "pdfjs-dist", "build", "pdf.min.mjs"),
+    "lib_pdfjs":         os.path.join(WORKSPACE_DIR, "node_modules", "pdfjs-dist", "build", "pdf.min.js"),
+    "lib_pdfjs_worker":  os.path.join(WORKSPACE_DIR, "node_modules", "pdfjs-dist", "build", "pdf.worker.min.js"),
     "lib_alpine":        os.path.join(WORKSPACE_DIR, "node_modules", "alpinejs", "dist", "cdn.min.js"),
     "lib_picocss":       os.path.join(WORKSPACE_DIR, "node_modules", "@picocss", "pico", "css", "pico.classless.min.css"),
 }
