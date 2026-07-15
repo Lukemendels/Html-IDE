@@ -2,7 +2,10 @@
 import os
 import urllib.request
 
-WORKSPACE_DIR = "/home/luke/BrainDump"
+WORKSPACE_DIR = os.environ.get(
+    "HTMLIDE_WORKSPACE",
+    os.path.dirname(os.path.abspath(__file__)),
+)
 TEMPLATE_PATH = os.path.join(WORKSPACE_DIR, "local-ide.src.html")
 OUTPUT_PATH = os.path.join(WORKSPACE_DIR, "local-ide.html")
 OUTPUT_PATH_PUBLIC = os.path.join(WORKSPACE_DIR, "public", "local-ide.html")
