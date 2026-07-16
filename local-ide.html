@@ -3763,9 +3763,8 @@ Prism.languages.js = Prism.languages.javascript;
     }
 
     function escapeScriptTextForHtml(jsText) {
-      // HTML parsers terminate a script element at a literal case-insensitive
-      // "</script" token even when that token appears inside a JavaScript
-      // string/comment/template. Escape only script payload text at the exact
+      // HTML parsers terminate a script element at a literal closing-script token
+      // even when that token appears inside a JavaScript string/comment/template. Escape only script payload text at the exact
       // point where it becomes HTML script content.
       return String(jsText || '').replace(/<\/script/gi, '<\\/script');
     }
@@ -3782,7 +3781,8 @@ Prism.languages.js = Prism.languages.javascript;
         for (; i < html.length; i++) {
           const c = html[i];
           const n = html[i + 1];
-          const maybeClose = html.slice(i, i + 8).toLowerCase() === '</script';
+          const closingScriptPrefix = '<' + '/script';
+          const maybeClose = html.slice(i, i + closingScriptPrefix.length).toLowerCase() === closingScriptPrefix;
           if (maybeClose && mode === null) break;
           if (maybeClose && mode !== null) {
             output += '<\\/script';
@@ -4473,8 +4473,15 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
       });
     });
 
+    window.__LOCAL_HTML_IDE_READY__ = true;
+
     } catch (err) {
       console.error('CRITICAL INITIALIZATION ERROR:', err.stack || err);
+      window.__LOCAL_HTML_IDE_READY__ = false;
+      const banner = document.createElement('div');
+      banner.textContent = 'Local HTML IDE startup failed: ' + (err.message || err);
+      banner.style.cssText = 'position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:99999;background:#7f1d1d;color:#fee2e2;border:1px solid #fecaca;padding:.75rem 1rem;border-radius:.75rem;font:12px ui-monospace,monospace;white-space:pre-wrap';
+      document.body.appendChild(banner);
     }
   </script>
 
