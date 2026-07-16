@@ -1,0 +1,132 @@
+name: Build standalone Local HTML IDE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/implement-skill-editor-and-library-catalog-enhancements]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: standalone-ide-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-browser:
+    if: "!contains(github.event.head_commit.message || '', '[skip ci]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      npm_config_registry: https://registry.npmjs.org/
+    steps:
+      - name: Check out PR source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Keep PR 5 in formal draft state
+        if: github.repository == 'Lukemendels/Html-IDE' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr ready 5 --undo || gh pr view 5 --json isDraft --jq '.isDraft' | grep true
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install official dependencies and regenerate lockfile
+        run: npm install --ignore-scripts
+
+      - name: Verify exact official library packages
+        run: node tests/library-catalog.test.cjs --assets-only
+
+      - name: Build standalone artifacts
+        run: python3 build_local_ide.py
+
+      - name: Validate generated architecture and serialization
+        run: |
+          ! grep -F 'state.currentSkillTemplate' local-ide.html
+          ! grep -F 'Current Tool Skill' local-ide.html
+          ! grep -E 'compatibility payload|placeholder implementation|not bundled.*npm install' local-ide.html
+          grep -F 'Built App Skill' local-ide.html
+          grep -F 'Copy IDE Skill' local-ide.html
+          grep -F 'Copy Rendered App Skill' local-ide.html
+          grep -F '"version": "2.1"' local-ide.html
+          test "$(grep -o 'id="generated-library-catalog"' local-ide.html | wc -l)" -eq 1
+
+      - name: Run automated suite
+        run: |
+          node tests/patch-engine.test.cjs
+          node tests/multi-surface-patch.test.cjs
+          node tests/ide-skill-format.test.cjs
+          node tests/app-skill-roundtrip.test.cjs
+          node tests/patch-context.test.cjs
+          node tests/library-catalog.test.cjs
+          node tests/nonblocking-status.test.cjs
+          node tests/export-integrity.test.cjs
+          node tests/generated-html-structure.test.cjs
+          node tests/generated-main-script-syntax.test.cjs
+          node test_export.cjs
+          npm run lint
+          git diff --check
+          cmp -s local-ide.html public/local-ide.html
+          test -s local-ide.html
+          test -s public/local-ide.html
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run file protocol browser smoke tests
+        run: node tests/browser-smoke.mjs
+
+      - name: Create build report
+        run: |
+          mkdir -p test-results
+          {
+            echo '# Standalone IDE build report'
+            echo
+            echo '## Artifacts'
+            current=$(wc -c < local-ide.html)
+            baseline=$(git show origin/main:local-ide.html | wc -c)
+            echo "local-ide.html: $current bytes; main baseline: $baseline bytes; increase: $((current-baseline)) bytes"
+            wc -c local-ide.html public/local-ide.html
+            sha256sum local-ide.html public/local-ide.html
+            echo
+            echo '## Official browser payloads'
+            node - <<'NODE'
+          const fs=require('fs');
+          const registry=require('./config/offline-libraries.json');
+          for(const item of registry.filter(x=>x.version)) console.log(`${item.displayName} ${item.version}: ${fs.statSync(item.browserBundlePath).size} bytes (${item.browserBundlePath})`);
+          NODE
+          } | tee test-results/build-report.md
+
+      - name: Upload standalone IDE, report, and screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-local-html-ide
+          if-no-files-found: error
+          path: |
+            local-ide.html
+            public/local-ide.html
+            test-results/build-report.md
+            test-results/screenshots/*.png
+
+      - name: Commit regenerated lockfile and artifacts
+        if: github.repository == 'Lukemendels/Html-IDE' && github.event_name != 'pull_request' && github.ref_name == 'codex/implement-skill-editor-and-library-catalog-enhancements'
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package-lock.json local-ide.html public/local-ide.html
+          if git diff --cached --quiet; then
+            echo 'Generated outputs already current.'
+          else
+            git commit -m 'build: regenerate standalone IDE with official library bundles [skip ci]'
+            git push origin HEAD:codex/implement-skill-editor-and-library-catalog-enhancements
+          fi

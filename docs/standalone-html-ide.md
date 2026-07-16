@@ -97,3 +97,7 @@ The build injects the registry stem section into the IDE Skill and renders the l
 ## Non-blocking status
 
 Routine patch apply/undo, skill reset/default save, copy, file-load, and download completion use the shared dark-theme `#app-status` aria-live region or temporary labels. Confirmations remain for patch approval, workspace reset, undo after intervening edits, and integrity-warning download. Actionable failures remain prominent.
+
+## Reproducible release automation
+
+`.github/workflows/build-standalone-ide.yml` is the release gate for the standalone files. On the PR branch it installs the exact official catalog packages on a GitHub-hosted Node.js 20 runner, regenerates the npm lockfile and both HTML artifacts, runs source and generated-artifact tests, opens the result under `file://` in Chromium, uploads the IDE, report, and screenshots, and commits changed generated outputs back to the same branch. Missing, undersized, wrong-version, or shim payloads stop the workflow; they are never substituted.
