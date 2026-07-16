@@ -91,6 +91,14 @@ def load_lib(token, path):
         print(f"  WARNING: {token} not found at {path} — embedding empty stub")
         return f"/* {token} not bundled — run npm install */\nconsole.warn('{token} not loaded');"
 
+def escape_script_data_block(content):
+    """Keep library text safe inside HTML <script> data blocks."""
+    return re.sub(r"</script", r"<\\/script", content, flags=re.IGNORECASE)
+
+def escape_style_data_block(content):
+    """Keep CSS text safe inside HTML <style> data blocks."""
+    return re.sub(r"</style", r"<\\/style", content, flags=re.IGNORECASE)
+
 def main():
     if not os.path.exists(TEMPLATE_PATH):
         print(f"Error: Template file not found at {TEMPLATE_PATH}")
@@ -133,6 +141,10 @@ def main():
 
     print("Inlining offline library vault...")
     for token, content in libs.items():
+        if token == "lib_picocss":
+            content = escape_style_data_block(content)
+        else:
+            content = escape_script_data_block(content)
         placeholder = f"/* {{{{{token}}}}} */"
         html_content = html_content.replace(placeholder, content)
 

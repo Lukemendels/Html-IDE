@@ -843,7 +843,11 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function triggerLivePreview() {
       clearTimeout(renderDebounceTimer);
       renderDebounceTimer = setTimeout(() => {
-        elements.previewFrame.srcdoc = packLibraries(state.code);
+        try {
+          elements.previewFrame.srcdoc = compileAppSource(state.code, { embedStickShift: false }).html;
+        } catch (err) {
+          elements.previewFrame.srcdoc = `<pre style="white-space:pre-wrap;color:#fca5a5;background:#111827;padding:1rem;font-family:monospace">${String(err.message || err).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>`;
+        }
       }, 250);
     }
 
@@ -1027,6 +1031,82 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       return cleanedHtml;
     }
 
+    function escapeScriptTextForHtml(jsText) {
+      // HTML parsers terminate a script element at a literal case-insensitive
+      // "</script" token even when that token appears inside a JavaScript
+      // string/comment/template. Escape only script payload text at the exact
+      // point where it becomes HTML script content.
+      return String(jsText || '').replace(/<\/script/gi, '<\\/script');
+    }
+
+    function escapeInlineScriptBreakouts(html) {
+      let output = '';
+      let cursor = 0;
+      const openRe = /<script\b[^>]*>/gi;
+      let openMatch;
+      while ((openMatch = openRe.exec(html)) !== null) {
+        output += html.slice(cursor, openMatch.index) + openMatch[0];
+        let i = openRe.lastIndex;
+        let mode = null;
+        for (; i < html.length; i++) {
+          const c = html[i];
+          const n = html[i + 1];
+          const maybeClose = html.slice(i, i + 8).toLowerCase() === '</script';
+          if (maybeClose && mode === null) break;
+          if (maybeClose && mode !== null) {
+            output += '<\\/script';
+            i += 7;
+            continue;
+          }
+          output += c;
+          if (mode === null) {
+            if (c === '"' || c === "'" || c === '`') mode = c;
+            else if (c === '/' && n === '/') { mode = 'L'; output += n; i++; }
+            else if (c === '/' && n === '*') { mode = 'B'; output += n; i++; }
+          } else if (mode === 'L') {
+            if (c === '\n') mode = null;
+          } else if (mode === 'B') {
+            if (c === '*' && n === '/') { output += n; i++; mode = null; }
+          } else if (c === '\\') {
+            if (i + 1 < html.length) { output += html[i + 1]; i++; }
+          } else if (c === mode) {
+            mode = null;
+          }
+        }
+        const closeEnd = html.indexOf('>', i);
+        if (i < html.length && closeEnd !== -1) {
+          output += html.slice(i, closeEnd + 1);
+          cursor = closeEnd + 1;
+          openRe.lastIndex = cursor;
+        } else {
+          cursor = i;
+          break;
+        }
+      }
+      return output + html.slice(cursor);
+    }
+
+    function validateCompiledAppHtml(html) {
+      const unresolvedStem = html.match(/<(?:script|link)\b[^>]*id=["']lib-[^"']+-stem["'][^>]*>/i);
+      if (unresolvedStem) {
+        return { ok: false, errors: ['Unresolved library stem remains: ' + unresolvedStem[0].slice(0, 120)] };
+      }
+      if (/<script\b[^>]*id=["']injected-lib-pdfjs["'][^>]*>/i.test(html) && !/<script\b[^>]*id=["']injected-lib-pdfjs-worker["'][^>]*type=["']text\/plain["'][^>]*>/i.test(html)) {
+        return { ok: false, errors: ['PDF.js was injected without its inlined worker payload.'] };
+      }
+      const duplicateIds = [];
+      const seen = new Set();
+      html.replace(/id=["'](injected-lib-[^"']+)["']/gi, (_, id) => {
+        if (seen.has(id)) duplicateIds.push(id);
+        seen.add(id);
+        return _;
+      });
+      if (duplicateIds.length) {
+        return { ok: false, errors: ['Duplicate injected library id(s): ' + duplicateIds.join(', ')] };
+      }
+      return { ok: true, errors: [] };
+    }
+
     // Pack Libraries: replaces stems with full inlined library content
     function packLibraries(html) {
       let packedHtml = html;
@@ -1049,8 +1129,8 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
             const workerContent = workerContainer ? workerContainer.textContent : '';
 
             packedHtml = packedHtml.replace(stemRegex, () => {
-              return `<script id="injected-${libId}">\n${content}\n<\/script>\n` +
-                     `<script id="injected-${libId}-worker" type="text/plain">\n${workerContent}\n<\/script>\n` +
+              return `<script id="injected-${libId}">\n${escapeScriptTextForHtml(content)}\n<\/script>\n` +
+                     `<script id="injected-${libId}-worker" type="text/plain">\n${escapeScriptTextForHtml(workerContent)}\n<\/script>\n` +
                      `<script id="injected-${libId}-setup">\n` +
                      `if (typeof window !== 'undefined' && window.pdfjsLib) {\n` +
                      `  const workerContent = document.getElementById('injected-${libId}-worker').textContent;\n` +
@@ -1061,12 +1141,21 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
             });
           } else {
             const stemRegex = new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`, 'gi');
-            packedHtml = packedHtml.replace(stemRegex, () => `<script id="injected-${libId}">\n${content}\n<\/script>`);
+            packedHtml = packedHtml.replace(stemRegex, () => `<script id="injected-${libId}">\n${escapeScriptTextForHtml(content)}\n<\/script>`);
           }
         }
       });
 
       return packedHtml;
+    }
+
+    function compileAppSource(editableSource, options = {}) {
+      let compiled = packLibraries(escapeInlineScriptBreakouts(editableSource));
+      const fileName = options.fileName || state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
+      if (options.embedStickShift) compiled = injectStickShiftCompliance(compiled, fileName);
+      const validation = validateCompiledAppHtml(compiled);
+      if (!validation.ok) throw new Error('Compiled app validation failed:\n' + validation.errors.join('\n'));
+      return { html: compiled, fileName, validation };
     }
 
     // Sync Library Indicators on UI Accordion
@@ -1414,15 +1503,15 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
 
     function availableLibraryStemManifest() {
       return [
-        'Alpine.js: <script id="lib-alpine-stem"></script>',
+        'Alpine.js: <script id="lib-alpine-stem"><\/script>',
         'Pico.css: <link rel="stylesheet" id="lib-picocss-stem">',
-        'JSZip: <script id="lib-jszip-stem"></script>',
-        'docxtemplater: <script id="lib-docxtemplater-stem"></script>',
-        'docx: <script id="lib-docx-stem"></script>',
-        'Mammoth.js: <script id="lib-mammoth-stem"></script>',
-        'SheetJS (xlsx): <script id="lib-sheetjs-stem"></script>',
-        'PptxGenJS: <script id="lib-pptxgen-stem"></script>',
-        'PDF.js: <script id="lib-pdfjs-stem"></script>'
+        'JSZip: <script id="lib-jszip-stem"><\/script>',
+        'docxtemplater: <script id="lib-docxtemplater-stem"><\/script>',
+        'docx: <script id="lib-docx-stem"><\/script>',
+        'Mammoth.js: <script id="lib-mammoth-stem"><\/script>',
+        'SheetJS (xlsx): <script id="lib-sheetjs-stem"><\/script>',
+        'PptxGenJS: <script id="lib-pptxgen-stem"><\/script>',
+        'PDF.js: <script id="lib-pdfjs-stem"><\/script>'
       ].join('\n');
     }
 
@@ -1490,15 +1579,17 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
     elements.libPackerContent.style.maxHeight = '0px';
 
     elements.downloadBtn.addEventListener('click', () => {
-      // Pack the editor's code directly based on the stems present
-      let finalCode = packLibraries(state.code);
-
-      const fileName = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
-
-      // StickShift compliance is opt-in via the header checkbox
-      if (elements.ssEmbedCheckbox && elements.ssEmbedCheckbox.checked) {
-        finalCode = injectStickShiftCompliance(finalCode, fileName);
+      let compiled;
+      try {
+        compiled = compileAppSource(state.code, {
+          embedStickShift: !!(elements.ssEmbedCheckbox && elements.ssEmbedCheckbox.checked)
+        });
+      } catch (err) {
+        alert(err.message || String(err));
+        return;
       }
+      const finalCode = compiled.html;
+      const fileName = compiled.fileName;
 
       // Guard against closing-script sequences hiding inside JS strings —
       // these silently corrupt the exported file when a browser parses it
@@ -1526,35 +1617,33 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
     });
 
     // Load sample packet helper link
-    elements.loadExamplePacket.addEventListener('click', (e) => {
+    elements.loadExamplePacket.addEventListener('click', async (e) => {
       e.preventDefault();
-      elements.aiPacketInput.value = `SEARCH:
-    <!-- Circular Dial Visual -->
-    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
-      <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
-      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45"></div>
-
-      <!-- Time counter -->
-      <div class="z-10">
-        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
-        <div id="sessionType" class="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
-      </div>
-    </div>
-REPLACE:
-    <!-- Circular Dial Visual (Enhanced with subtle glow border) -->
-    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
-      <div class="absolute inset-0 rounded-full border-4 border-purple-500/30 shadow-lg shadow-purple-500/20"></div>
-      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 border-r-purple-500 transition-all duration-1000 rotate-45"></div>
-
-      <!-- Time counter -->
-      <div class="z-10">
-        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]">25:00</span>
-        <div id="sessionType" class="text-[10px] text-purple-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
-      </div>
-    </div>`;
-      if (!state.aiDrawerOpen) {
-        state.aiDrawerOpen = true;
-        updateAiDrawerLayout();
+      try {
+        const search = '<h1>Focus Session</h1>';
+        const matches = patchEngine.findExactMatches(state.code, search);
+        if (matches.length !== 1) throw new Error('No safe unique example target found in the current source.');
+        const sourceHash = await patchEngine.sourceHash(state.code);
+        const packet = {
+          protocol: 'html-ide-patch',
+          version: '2.0',
+          target: { sourceHash },
+          patches: [{
+            id: 'example-update-heading',
+            operation: 'replace',
+            matching: { strategy: 'exact', expectedMatches: 1, search },
+            replacement: '<h1>Deep Focus Session</h1>'
+          }]
+        };
+        const packetText = JSON.stringify(packet, null, 2);
+        await patchEngine.preflightPatchPacket(packetText, state.code);
+        elements.aiPacketInput.value = packetText;
+        if (!state.aiDrawerOpen) {
+          state.aiDrawerOpen = true;
+          updateAiDrawerLayout();
+        }
+      } catch (err) {
+        alert('Could not generate a structured example packet: ' + (err.message || err));
       }
     });
 

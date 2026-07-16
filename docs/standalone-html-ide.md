@@ -54,3 +54,24 @@ Completed apps can receive an embedded StickShift companion skill. For app-speci
 ## Tests and manual smoke checks
 
 Run `node tests/patch-engine.test.cjs`, `node test_export.cjs`, `npm run lint`, and `python3 build_local_ide.py`. The patch-engine tests execute the same `scripts/patch-engine.cjs` production engine that is inlined into the standalone artifact. Manual Chrome/Linux checks should open the root `local-ide.html` under `file://`, paste a complete HTML app, verify preview, apply a structured patch, verify ambiguous-patch rejection, undo, download the completed app, reopen it offline, and test browser-storage loss/recovery via downloaded files.
+
+## Script breakout and export-integrity guardrails
+
+The historical export failure occurs when JavaScript text that is being embedded into an HTML `<script>` element contains a literal case-insensitive `</script` sequence. The browser's HTML parser terminates the script element at that token even if it appears inside a JavaScript string, template literal, regular expression, or comment. The visible symptom is raw JavaScript rendered as body text in a downloaded compiled app.
+
+The canonical escaping rule is implemented at the script-embedding boundary: JavaScript payload text is transformed from `</script` to `<\/script` before it is placed inside an HTML script data block. This preserves JavaScript runtime semantics while preventing premature HTML parser termination. CSS payload text stored in style blocks receives the analogous `</style` guard at build time.
+
+The packed-library path is:
+
+```text
+node_modules library file
+→ build_local_ide.py escapes script/style data-block hazards
+→ hidden library vault in local-ide.html
+→ editable app stem tag such as <script id="lib-jszip-stem"></script>
+→ compileAppSource(editableSource, options)
+→ escapeInlineScriptBreakouts() for authored inline app scripts
+→ packLibraries() with escapeScriptTextForHtml() for JavaScript library payloads and PDF.js worker text
+→ preview iframe srcdoc and downloaded completed app use the same compiled HTML path
+```
+
+Preview and download now share `compileAppSource()`. Preview calls it without StickShift injection, while download calls it with the current StickShift checkbox state; library resolution and script escaping are otherwise shared. Export validation currently checks unresolved stems, duplicate injected-library IDs, and missing PDF.js worker payloads. Browser-based validation is still desirable as a release gate, but this execution environment did not provide Chromium or Playwright.
