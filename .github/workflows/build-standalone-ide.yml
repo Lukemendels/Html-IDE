@@ -19,15 +19,16 @@ jobs:
   build-test-browser:
     if: "!contains(github.event.head_commit.message || '', '[skip ci]')"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       npm_config_registry: https://registry.npmjs.org/
+      PR_BRANCH: codex/implement-skill-editor-and-library-catalog-enhancements
     steps:
-      - name: Check out PR source
+      - name: Check out writable branch or read-only PR SHA
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || 'codex/implement-skill-editor-and-library-catalog-enhancements' }}
 
       - name: Keep PR 5 in formal draft state
         if: github.repository == 'Lukemendels/Html-IDE' && github.event_name != 'pull_request'
@@ -61,7 +62,7 @@ jobs:
           grep -F '"version": "2.1"' local-ide.html
           test "$(grep -o 'id="generated-library-catalog"' local-ide.html | wc -l)" -eq 1
 
-      - name: Run automated suite
+      - name: Run non-browser automated suite
         run: |
           node tests/patch-engine.test.cjs
           node tests/multi-surface-patch.test.cjs
@@ -80,47 +81,93 @@ jobs:
           test -s local-ide.html
           test -s public/local-ide.html
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run file protocol browser smoke tests
-        run: node tests/browser-smoke.mjs
-
-      - name: Create build report
+      - name: Generate build-stage report
         run: |
           mkdir -p test-results
-          {
-            echo '# Standalone IDE build report'
-            echo
-            echo '## Artifacts'
-            current=$(wc -c < local-ide.html)
-            baseline=$(git show origin/main:local-ide.html | wc -c)
-            echo "local-ide.html: $current bytes; main baseline: $baseline bytes; increase: $((current-baseline)) bytes"
-            wc -c local-ide.html public/local-ide.html
-            sha256sum local-ide.html public/local-ide.html
-            echo
-            echo '## Official browser payloads'
-            node - <<'NODE'
+          node - <<'NODE' > test-results/library-payloads.txt
           const fs=require('fs');
           const registry=require('./config/offline-libraries.json');
           for(const item of registry.filter(x=>x.version)) console.log(`${item.displayName} ${item.version}: ${fs.statSync(item.browserBundlePath).size} bytes (${item.browserBundlePath})`);
           NODE
+          current=$(wc -c < local-ide.html)
+          baseline=$(git show origin/main:local-ide.html | wc -c)
+          identical=no; cmp -s local-ide.html public/local-ide.html && identical=yes
+          {
+            echo '# Standalone IDE build report'
+            echo
+            echo '## Official packages and browser payloads'
+            cat test-results/library-payloads.txt
+            echo
+            echo '## Artifacts'
+            wc -c local-ide.html public/local-ide.html
+            sha256sum local-ide.html public/local-ide.html
+            echo "Root/public byte-identical: $identical"
+            echo "Main local-ide.html: $baseline bytes"
+            echo "Feature local-ide.html: $current bytes"
+            echo "Increase relative to main: $((current-baseline)) bytes"
+            echo
+            echo '## Test status'
+            echo 'Non-browser suite: passed'
+            echo 'Browser smoke: pending'
           } | tee test-results/build-report.md
 
-      - name: Upload standalone IDE, report, and screenshots
+      - name: Upload build-stage standalone artifact
         uses: actions/upload-artifact@v4
         with:
-          name: standalone-local-html-ide
+          name: standalone-local-html-ide-build
           if-no-files-found: error
           path: |
             local-ide.html
             public/local-ide.html
+            package-lock.json
             test-results/build-report.md
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run file protocol browser smoke tests
+        id: browser_smoke
+        run: |
+          set -o pipefail
+          node tests/browser-smoke.mjs 2>&1 | tee test-results/browser-smoke-output.log
+
+      - name: Record browser success in build report
+        if: success()
+        run: |
+          sed -i 's/Browser smoke: pending/Browser smoke: passed/' test-results/build-report.md
+          echo 'Browser smoke: passed' > test-results/browser-result.txt
+
+      - name: Record browser failure diagnostics
+        if: failure() && steps.browser_smoke.outcome == 'failure'
+        run: |
+          sed -i 's/Browser smoke: pending/Browser smoke: failed — see browser diagnostics artifact/' test-results/build-report.md || true
+          echo 'Browser smoke: failed — see browser-smoke-output.log and playwright-trace.zip' > test-results/browser-result.txt
+
+      - name: Upload browser diagnostics and screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-local-html-ide-browser-diagnostics
+          if-no-files-found: warn
+          path: |
+            test-results/build-report.md
+            test-results/browser-result.txt
+            test-results/browser-smoke-output.log
+            test-results/browser-console.log
+            test-results/page-errors.log
+            test-results/request-failures.log
+            test-results/dialogs.log
+            test-results/browser-steps.log
+            test-results/failure-dom.html
+            test-results/playwright-trace.zip
             test-results/screenshots/*.png
+            test-results/*-compiled.html
 
       - name: Commit regenerated lockfile and artifacts
-        if: github.repository == 'Lukemendels/Html-IDE' && github.event_name != 'pull_request' && github.ref_name == 'codex/implement-skill-editor-and-library-catalog-enhancements'
+        if: success() && github.repository == 'Lukemendels/Html-IDE' && github.event_name != 'pull_request' && github.ref_name == 'codex/implement-skill-editor-and-library-catalog-enhancements'
         run: |
+          git switch "$PR_BRANCH"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add package-lock.json local-ide.html public/local-ide.html
@@ -128,5 +175,5 @@ jobs:
             echo 'Generated outputs already current.'
           else
             git commit -m 'build: regenerate standalone IDE with official library bundles [skip ci]'
-            git push origin HEAD:codex/implement-skill-editor-and-library-catalog-enhancements
+            git push origin "$PR_BRANCH"
           fi
