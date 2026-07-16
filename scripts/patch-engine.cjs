@@ -45,26 +45,28 @@
     let parsed;
     try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
     if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
-    if (parsed.version !== '2.0') throw new Error('Unsupported html-ide-patch version: ' + (parsed.version || '(missing)'));
-    if (!parsed.target || typeof parsed.target.sourceHash !== 'string') throw new Error('Structured patches require target.sourceHash.');
-    if (!Array.isArray(parsed.patches) || parsed.patches.length === 0) throw new Error('Structured patches require a non-empty patches array.');
-    const ids = new Set();
+    if (parsed.version !== '2.0' && parsed.version !== '2.1') throw new Error('Unsupported html-ide-patch version: ' + (parsed.version || '(missing)'));
+    if (parsed.version === '2.0' && (!parsed.target || typeof parsed.target.sourceHash !== 'string')) throw new Error('v2.0 patches require target.sourceHash.');
+    if (parsed.version === '2.1' && (!parsed.targets || typeof parsed.targets !== 'object')) throw new Error('v2.1 patches require targets.');
+    if (!Array.isArray(parsed.patches) || !parsed.patches.length) throw new Error('Structured patches require a non-empty patches array.');
+    const ids = new Set(), referenced = new Set();
     parsed.patches.forEach((patch, idx) => {
       const label = 'Patch #' + (idx + 1);
       if (!patch || typeof patch !== 'object') throw new Error(label + ' must be an object.');
       if (!patch.id || typeof patch.id !== 'string') throw new Error(label + ' requires a string id.');
-      if (ids.has(patch.id)) throw new Error('Duplicate patch id: ' + patch.id);
-      ids.add(patch.id);
+      if (ids.has(patch.id)) throw new Error('Duplicate patch id: ' + patch.id); ids.add(patch.id);
+      if (parsed.version === '2.1') {
+        if (patch.surface !== 'html' && patch.surface !== 'appSkill') throw new Error('Patch ' + patch.id + ' requires surface html or appSkill.');
+      } else patch.surface = 'html';
+      referenced.add(patch.surface);
       if (!SUPPORTED_OPERATIONS.includes(patch.operation)) throw new Error('Patch ' + patch.id + ' has unsupported operation: ' + patch.operation);
       if (!patch.matching || typeof patch.matching !== 'object') throw new Error('Patch ' + patch.id + ' requires matching.');
-      if ((patch.matching.strategy || 'exact') !== 'exact') throw new Error('Patch ' + patch.id + ' has unsupported matching strategy for v2.0: ' + patch.matching.strategy + '. Use exact.');
+      if ((patch.matching.strategy || 'exact') !== 'exact') throw new Error('Patch ' + patch.id + ' has unsupported matching strategy. Use exact.');
       if (!Number.isInteger(patch.matching.expectedMatches) || patch.matching.expectedMatches < 1) throw new Error('Patch ' + patch.id + ' requires expectedMatches >= 1.');
-      if (patch.operation === 'replace_region') {
-        if (!patch.matching.region || typeof patch.matching.region !== 'string') throw new Error('Patch ' + patch.id + ' replace_region requires matching.region.');
-      } else if (typeof patch.matching.search !== 'string' || patch.matching.search.length === 0) {
-        throw new Error('Patch ' + patch.id + ' requires a non-empty matching.search string.');
-      }
+      if (patch.operation === 'replace_region') { if (!patch.matching.region || typeof patch.matching.region !== 'string') throw new Error('Patch ' + patch.id + ' replace_region requires matching.region.'); }
+      else if (typeof patch.matching.search !== 'string' || !patch.matching.search.length) throw new Error('Patch ' + patch.id + ' requires a non-empty matching.search string.');
     });
+    if (parsed.version === '2.1') referenced.forEach(surface => { if (!parsed.targets[surface] || typeof parsed.targets[surface].sourceHash !== 'string') throw new Error('v2.1 patches referencing ' + surface + ' require targets.' + surface + '.sourceHash.'); });
     return parsed;
   }
 
@@ -146,30 +148,39 @@
     return output;
   }
 
-  async function preflightPatchPacket(packetText, source) {
+  async function preflightPatchPacket(packetText, sourceOrSurfaces) {
     const packet = parsePatchPacket(packetText);
-    const currentHash = await sourceHash(source);
-    if (!packet.legacy && packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
-    const resolvedItems = [];
-    for (const patch of packet.patches) {
-      const resolution = resolvePatch(source, patch);
-      if (!resolution.ok) throw new Error('Patch ' + patch.id + ' failed preflight: ' + resolution.error);
-      resolvedItems.push({ patch, resolution });
+    const legacyString = typeof sourceOrSurfaces === 'string';
+    const surfaces = legacyString ? { html: sourceOrSurfaces, appSkill: '' } : { html: String(sourceOrSurfaces.html || ''), appSkill: String(sourceOrSurfaces.appSkill || '') };
+    const affectedSurfaces = [...new Set(packet.patches.map(p => p.surface || 'html'))];
+    const currentHashes = {}, nextHashes = {}, outputs = { ...surfaces }, resolvedBySurface = {};
+    for (const surface of affectedSurfaces) currentHashes[surface] = await sourceHash(surfaces[surface]);
+    if (!packet.legacy) {
+      for (const surface of affectedSurfaces) {
+        const expected = packet.version === '2.0' ? packet.target.sourceHash : packet.targets[surface].sourceHash;
+        if (expected !== currentHashes[surface]) throw new Error((packet.version === '2.0' ? 'Stale patch rejected' : 'Stale ' + surface + ' patch rejected') + '. Expected ' + expected + ' but current source is ' + currentHashes[surface] + '.');
+      }
     }
-    collectRanges(resolvedItems);
-    const output = applyResolved(source, resolvedItems);
-    const nextHash = await sourceHash(output);
-    return { packet, currentHash, nextHash, output, resolvedItems };
+    for (const surface of affectedSurfaces) {
+      const resolvedItems = [];
+      for (const patch of packet.patches.filter(p => (p.surface || 'html') === surface)) {
+        const resolution = resolvePatch(surfaces[surface], patch);
+        if (!resolution.ok) throw new Error('Patch ' + patch.id + (packet.version === '2.1' ? ' on ' + surface : '') + ' failed preflight: ' + resolution.error);
+        resolvedItems.push({ patch, resolution });
+      }
+      collectRanges(resolvedItems); resolvedBySurface[surface] = resolvedItems;
+      outputs[surface] = applyResolved(surfaces[surface], resolvedItems); nextHashes[surface] = await sourceHash(outputs[surface]);
+    }
+    const resolvedItems = affectedSurfaces.flatMap(surface => resolvedBySurface[surface]);
+    return { packet, affectedSurfaces, currentHashes, nextHashes, outputs, resolvedBySurface, resolvedItems,
+      currentHash: currentHashes.html, nextHash: nextHashes.html, output: outputs.html };
   }
 
-  function summarizePreflight(report, source) {
-    const lines = [(report.packet.legacy ? 'Legacy SEARCH/REPLACE compatibility packet' : 'Structured html-ide-patch v2 packet'), 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
-    report.resolvedItems.forEach(item => {
-      const ranges = item.resolution.matches.map(m => 'line ' + lineFromIndex(source, m.start) + ', chars ' + m.start + '-' + m.end).join('; ');
-      lines.push('- ' + item.patch.id + ' [' + item.patch.operation + '] ' + ranges);
-    });
-    if (report.packet.legacy) lines.push('Warning: legacy packets do not include source hashes and are less safe than v2 JSON packets.');
-    return lines.join('\n');
+  function summarizePreflight(report, sourceOrSurfaces) {
+    const surfaces = typeof sourceOrSurfaces === 'string' ? { html: sourceOrSurfaces } : sourceOrSurfaces;
+    const lines = [(report.packet.legacy ? 'Legacy HTML-only packet' : 'Structured html-ide-patch v' + report.packet.version), 'Affected surfaces: ' + report.affectedSurfaces.join(', '), 'Patch count: ' + report.packet.patches.length];
+    report.affectedSurfaces.forEach(surface => { lines.push(surface + ': ' + report.currentHashes[surface] + ' -> ' + report.nextHashes[surface]); (report.resolvedBySurface[surface] || []).forEach(item => lines.push('- ' + item.patch.id + ' [' + surface + '/' + item.patch.operation + '] ' + item.resolution.matches.map(m => 'line ' + lineFromIndex(surfaces[surface], m.start)).join('; '))); });
+    if (report.packet.legacy) lines.push('Warning: legacy packets are HTML-only, unhashed, and lower safety.'); return lines.join('\n');
   }
 
   function createHistory(limit) {

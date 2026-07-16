@@ -16,6 +16,8 @@ TAILWIND_CACHE_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "tailwind-cdn-
 PRISM_CSS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "themes", "prism-tomorrow.min.css")
 PRISM_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "prism.js")
 CODEJAR_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "codejar", "dist", "codejar.js")
+IDE_SKILL_PATH = os.path.join(WORKSPACE_DIR, "skills", "local-html-ide.md")
+DEFAULT_APP_SKILL_PATH = os.path.join(WORKSPACE_DIR, "templates", "default-built-app-skill.md")
 REGISTRY_PATH = os.path.join(WORKSPACE_DIR, "config", "offline-libraries.json")
 PATCH_ENGINE_JS_PATH = os.path.join(WORKSPACE_DIR, "scripts", "patch-engine.cjs")
 
@@ -145,6 +147,15 @@ def main():
     print(f"Reading template: {TEMPLATE_PATH}")
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html_content = f.read()
+
+    with open(IDE_SKILL_PATH, "r", encoding="utf-8") as f:
+        ide_skill = f.read()
+    with open(DEFAULT_APP_SKILL_PATH, "r", encoding="utf-8") as f:
+        default_app_skill = f.read()
+    stem_manifest = "\n".join("- " + item["displayName"] + ": `" + item["stemTag"] + "` — " + item["description"] for item in registry)
+    ide_skill = ide_skill.replace("{{OFFLINE_LIBRARY_STEMS}}", stem_manifest)
+    html_content = html_content.replace("{{IDE_SKILL_MARKDOWN}}", escape_script_data_block(ide_skill.rstrip("\n")))
+    html_content = html_content.replace('"{{DEFAULT_APP_SKILL_JSON}}"', escape_script_data_block(json.dumps(default_app_skill, ensure_ascii=False)))
 
     browser_registry = [{k: v for k, v in item.items() if k not in ("browserBundlePath", "workerAsset", "package")} for item in registry]
     html_content = html_content.replace("/* {{offline_library_registry}} */", escape_script_data_block(json.dumps(browser_registry, ensure_ascii=False, separators=(",", ":"))))

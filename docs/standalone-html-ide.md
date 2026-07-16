@@ -76,20 +76,24 @@ node_modules library file
 
 Preview and download now share `compileAppSource()`. Preview calls it without StickShift injection, while download calls it with the current StickShift checkbox state; library resolution and script escaping are otherwise shared. Export validation currently checks unresolved stems, duplicate injected-library IDs, and missing PDF.js worker payloads. Browser-based validation is still desirable as a release gate, but this execution environment did not provide Chromium or Playwright.
 
-## Current Tool Skill and reusable default
+## Two-skill architecture
 
-The **Current Tool Skill** textarea is the authoritative in-memory template passed explicitly to `compileAppSource`. Editing it marks the current tool modified; **Set as Reusable Default** is the only action that writes the reusable browser default. **Reset Current Skill to Default** restores that explicit default (or the built-in template). When **Embed StickShift** is off, compilation adds no generated compliance blocks.
+The read-only **Local HTML IDE Skill** is sourced from `skills/local-html-ide.md`. It teaches an agent how to operate the IDE, copy patch context, patch the independent `html` and `appSkill` surfaces, and use registry-backed stems. **Copy IDE Skill** copies this canonical Markdown through `textContent`; it is never used as an application compiler input.
 
-`{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are rendered from the output filename without modifying the template. **Copy Rendered Skill** and export use the same renderer. Export escapes case-insensitive closing-script text only at the HTML data-block boundary.
+The editable **Built App Skill** is sourced initially from `templates/default-built-app-skill.md`. It describes operation of the finished application rather than IDE patching. Its unrendered placeholder source is stored independently in `state.appSkillSource`; **Copy Rendered App Skill** and download resolve `{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}`. Setting a reusable app-skill default is explicit. Reopening a generated application recovers its rendered Built App Skill before compliance stripping and library unpacking.
 
-When opening a generated tool, the IDE extracts the marked `STICKSHIFT_SKILL` block before removing generated compliance and unpacking libraries. A later export canonicalizes all five marked blocks and embeds the edited skill once. An unmarked `stickshift-skill` is treated as a conflict and export stops rather than overwriting third-party content.
+## Two build surfaces and patch 2.1
 
-## Canonical offline catalog
+The workspace displays independent SHA-256 hashes for HTML and Built App Skill Markdown. Copy Patch Context includes both hashes, both exact source strings, the registry-derived stem manifest, and the v2.1 JSON-only response contract. Every v2.1 patch names `surface: "html"` or `surface: "appSkill"`; `targets` supplies a hash for every referenced surface. Preflight resolves all patches surface-locally, rejects stale hashes, ambiguity, invalid regions, and overlaps before mutation, then one confirmation commits one combined history entry. One undo restores both snapshots. Version 2.0 and legacy SEARCH/REPLACE remain HTML-only compatibility paths.
 
-`config/offline-libraries.json` is the machine-readable catalog for build assets, browser vault IDs, stems, injected IDs, descriptions, globals, and PDF.js worker handling. The supported stems are Alpine.js, Pico.css, JSZip, docxtemplater, docx, Mammoth.js, SheetJS, PptxGenJS, PDF.js, Chart.js, Day.js, Marked, DOMPurify, Papa Parse, SortableJS, and Fuse.js. The builder fails if a required asset is missing; run `npm install` first.
+## Canonical sources and catalog
 
-Offline payloads increase the standalone artifact by their minified browser-bundle sizes. Use stems rather than pasting full minified payloads, because pasted payloads defeat unpacking, reviewability, and size control. Catalog libraries never use a CDN at runtime.
+- IDE operator skill: `skills/local-html-ide.md`
+- Default application skill: `templates/default-built-app-skill.md`
+- Offline library registry: `config/offline-libraries.json`
+
+The build injects the registry stem section into the IDE Skill and renders the library drawer, patch manifest, vaults, packing, and indicators from the same records. The Built App Skill does not inherit the library catalog. Never paste full minified payloads into editable HTML.
 
 ## Non-blocking status
 
-Routine completion uses the shared dark-theme `#app-status` region (`aria-live="polite"`) and automatically clears. Copy controls may also change their label briefly. Patch apply/undo, skill changes, file open, and download do not use success dialogs. Confirmations remain for workspace reset, patch preflight, unsafe undo restore, and integrity-warning download. Actionable failures may still use blocking error dialogs so details remain prominent.
+Routine patch apply/undo, skill reset/default save, copy, file-load, and download completion use the shared dark-theme `#app-status` aria-live region or temporary labels. Confirmations remain for patch approval, workspace reset, undo after intervening edits, and integrity-warning download. Actionable failures remain prominent.

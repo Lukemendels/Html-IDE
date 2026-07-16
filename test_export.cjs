@@ -11,7 +11,7 @@ global.localStorage = {
   removeItem: k => { delete store[k]; }
 };
 const api = new Function('localStorage', logic +
-  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderSkillMarkdown, SS_KEYS };')(global.localStorage);
+  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderAppSkill, SS_KEYS };')(global.localStorage);
 
 let fail = 0;
 const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) fail++; };
@@ -53,14 +53,14 @@ check('double-injection guard', (reInjected.match(/STICKSHIFT_SKILL_START/g) || 
 
 // Skill markdown template substitution
 const DEFAULT_TEMPLATE = '{{TOOL_FILE}} {{SKILL_SLUG}} {{TOOL_TITLE}}';
-const md = api.renderSkillMarkdown(DEFAULT_TEMPLATE, 'demo.html', 'demo-skill', 'Demo Tool');
-check('renderSkillMarkdown substitutes tool file', md.includes('demo.html'));
-check('renderSkillMarkdown substitutes skill slug', md.includes('demo-skill'));
-check('renderSkillMarkdown substitutes tool title', md.includes('Demo Tool'));
+const md = api.renderAppSkill(DEFAULT_TEMPLATE, 'demo.html', 'demo-skill', 'Demo Tool');
+check('renderAppSkill substitutes tool file', md.includes('demo.html'));
+check('renderAppSkill substitutes skill slug', md.includes('demo-skill'));
+check('renderAppSkill substitutes tool title', md.includes('Demo Tool'));
 
 // Explicit custom template is used without consulting localStorage.
-const mdCustom = api.renderSkillMarkdown('Custom body for {{TOOL_TITLE}}.', 'demo.html', 'demo-skill', 'Demo Tool');
-check('renderSkillMarkdown uses explicit template', mdCustom === 'Custom body for Demo Tool.');
+const mdCustom = api.renderAppSkill('Custom body for {{TOOL_TITLE}}.', 'demo.html', 'demo-skill', 'Demo Tool');
+check('renderAppSkill uses explicit template', mdCustom === 'Custom body for Demo Tool.');
 
 // detectScriptBreakouts should flag a closing script sequence hidden inside
 // a JS string/template literal in an executing script block.

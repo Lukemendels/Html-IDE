@@ -1,0 +1,16 @@
+const assert=require('assert'),engine=require('../scripts/patch-engine.cjs');
+(async()=>{const base={html:'<h1>Old</h1>\n<p>x</p>',appSkill:'## Purpose\nOld purpose'};const hashes={html:await engine.sourceHash(base.html),appSkill:await engine.sourceHash(base.appSkill)};
+const packet=(patches,targets={html:{sourceHash:hashes.html},appSkill:{sourceHash:hashes.appSkill}})=>JSON.stringify({protocol:'html-ide-patch',version:'2.1',targets,patches});
+const patch=(id,surface,search,replacement)=>({id,surface,operation:'replace',matching:{strategy:'exact',expectedMatches:1,search},replacement});
+let r=await engine.preflightPatchPacket(packet([patch('h','html','Old','New')]),base);assert.equal(r.outputs.html,'<h1>New</h1>\n<p>x</p>');assert.equal(r.outputs.appSkill,base.appSkill);
+r=await engine.preflightPatchPacket(packet([patch('s','appSkill','Old purpose','New purpose')]),base);assert(r.outputs.appSkill.includes('New purpose'));
+r=await engine.preflightPatchPacket(packet([patch('h','html','Old','New'),patch('s','appSkill','Old purpose','New purpose')]),base);assert(r.outputs.html.includes('New')&&r.outputs.appSkill.includes('New purpose'));
+for(const [targets,re] of [[{html:{sourceHash:'sha256:stale'},appSkill:{sourceHash:hashes.appSkill}},/Stale html/],[{html:{sourceHash:hashes.html},appSkill:{sourceHash:'sha256:stale'}},/Stale appSkill/]]) await assert.rejects(()=>engine.preflightPatchPacket(packet([patch('h','html','Old','New'),patch('s','appSkill','Old purpose','New purpose')],targets),base),re);
+await assert.rejects(()=>engine.preflightPatchPacket(packet([patch('s','appSkill','Old purpose','New')],{html:{sourceHash:hashes.html}}),base),/targets.appSkill/);
+await assert.rejects(()=>engine.preflightPatchPacket(packet([{...patch('x','html','Old','New'),surface:'wat'}]),base),/surface html or appSkill/);
+await assert.rejects(()=>engine.preflightPatchPacket(packet([patch('x','html','Old','A'),patch('x','appSkill','Old purpose','B')]),base),/Duplicate/);
+await assert.rejects(()=>engine.preflightPatchPacket(packet([{...patch('a','html','>','y'),matching:{strategy:'exact',expectedMatches:1,search:'>'}}]),base),/found [2-9]/);
+const amb={...base,appSkill:'Old Old'};const ambHashes={html:{sourceHash:hashes.html},appSkill:{sourceHash:await engine.sourceHash(amb.appSkill)}};await assert.rejects(()=>engine.preflightPatchPacket(packet([{...patch('a','appSkill','Old','New'),matching:{strategy:'exact',expectedMatches:1,search:'Old'}}],ambHashes),amb),/found [2-9]/);
+await assert.rejects(()=>engine.preflightPatchPacket(packet([patch('a','html','<h1>Old</h1>','A'),patch('b','html','Old','B')]),base),/Overlapping/);
+const v20=JSON.stringify({protocol:'html-ide-patch',version:'2.0',target:{sourceHash:hashes.html},patches:[{id:'old',operation:'replace',matching:{strategy:'exact',expectedMatches:1,search:'Old'},replacement:'Legacy'}]});assert((await engine.preflightPatchPacket(v20,base)).outputs.html.includes('Legacy'));
+const history=engine.createHistory();history.push({before:base,after:r.outputs});assert.deepEqual(history.pop().before,base);console.log('multi-surface patch tests passed');})().catch(e=>{console.error(e);process.exit(1)});
