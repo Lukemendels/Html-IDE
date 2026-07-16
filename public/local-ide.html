@@ -709,6 +709,33 @@ include:
 Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
   </script>
 
+  <script>
+    window.__LOCAL_HTML_IDE_READY__ = false;
+    (function(){
+      function showStartupFailure(message){
+        try {
+          var banner = document.getElementById('local-html-ide-startup-error');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'local-html-ide-startup-error';
+            banner.style.cssText = 'position:fixed;left:1rem;right:1rem;bottom:1rem;z-index:99999;background:#7f1d1d;color:#fee2e2;border:1px solid #fecaca;padding:.75rem 1rem;border-radius:.75rem;font:12px ui-monospace,monospace;white-space:pre-wrap';
+            document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(banner); }, { once: true });
+            if (document.body) document.body.appendChild(banner);
+          }
+          banner.textContent = 'Local HTML IDE startup failed: ' + message;
+        } catch (e) {}
+      }
+      window.addEventListener('error', function(event) {
+        console.error('LOCAL HTML IDE STARTUP ERROR:', event.error || event.message);
+        if (!window.__LOCAL_HTML_IDE_READY__) showStartupFailure((event.error && (event.error.stack || event.error.message)) || event.message || event.error);
+      });
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('LOCAL HTML IDE STARTUP REJECTION:', event.reason);
+        if (!window.__LOCAL_HTML_IDE_READY__) showStartupFailure((event.reason && (event.reason.stack || event.reason.message)) || event.reason);
+      });
+    })();
+  </script>
+
   <!-- CUSTOM SCRIPTS INTEGRATING CLIENT LOGIC -->
   <script>
     // StickShift Tool Identity Declaration
@@ -717,9 +744,6 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       skillSlug: "local-html-ide",
       title: "Local HTML IDE"
     };
-    window.addEventListener('error', (event) => {
-      console.error('WINDOW ERROR:', event.error.stack || event.error.message || event.error);
-    });
     try {
     // Inlined CodeJar and Prism JS Libraries (Offline Bundled)
     const globalWindow = window;
@@ -3445,9 +3469,9 @@ Prism.languages.js = Prism.languages.javascript;
     function updateDisplay() {
       const minutes = Math.floor(timeRemaining / 60);
       const seconds = timeRemaining % 60;
-      timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      timerDisplay.textContent = minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
       const total = isWorkSession ? 25 * 60 : 5 * 60;
-      radialFill.style.transform = `rotate(${45 + (((total - timeRemaining) / total) * 360)}deg)`;
+      radialFill.style.transform = 'rotate(' + (45 + (((total - timeRemaining) / total) * 360)) + 'deg)';
     }
     function toggleTimer() {
       if (timerRunning) { clearInterval(timerInterval); playIcon.innerHTML = iconPath('play'); timerRunning = false; return; }
