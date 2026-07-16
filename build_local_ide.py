@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import urllib.request
 
 WORKSPACE_DIR = os.environ.get(
@@ -29,12 +30,38 @@ LIB_PATHS = {
     "lib_picocss":       os.path.join(WORKSPACE_DIR, "node_modules", "@picocss", "pico", "css", "pico.classless.min.css"),
 }
 
+def get_existing_tailwind_js():
+    if not os.path.exists(OUTPUT_PATH):
+        return None
+
+    print(f"Looking for Tailwind JS in existing standalone build: {OUTPUT_PATH}")
+    with open(OUTPUT_PATH, "r", encoding="utf-8") as f:
+        existing_html = f.read()
+
+    match = re.search(
+        r"<!-- Tailwind CSS v3 Browser Engine \(Offline Bundled\) -->\s*<script>([\s\S]*?)</script>",
+        existing_html,
+    )
+    if not match:
+        return None
+
+    code = match.group(1).strip()
+    if not code or "{{tailwind_js}}" in code:
+        return None
+
+    return code
+
 def get_tailwind_js():
     if os.path.exists(TAILWIND_CACHE_PATH):
         print(f"Loading Tailwind JS from local cache: {TAILWIND_CACHE_PATH}")
         with open(TAILWIND_CACHE_PATH, "r", encoding="utf-8") as f:
             return f.read()
     
+    existing_tailwind_js = get_existing_tailwind_js()
+    if existing_tailwind_js:
+        print("Loading Tailwind JS from existing standalone build.")
+        return existing_tailwind_js
+
     url = "https://cdn.tailwindcss.com"
     print(f"Fetching Tailwind JS from CDN: {url}")
     try:

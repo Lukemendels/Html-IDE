@@ -90,7 +90,6 @@ Check your Browserslist config to be sure that your targets are set up correctly
  * Released under the MIT License.
  */
 /*! https://mths.be/cssesc v3.0.0 by @mathias */
-
   </script>
   
   <!-- PrismJS Tomorrow Theme (Offline Bundled) -->
@@ -232,6 +231,11 @@ Check your Browserslist config to be sure that your targets are set up correctly
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
         <span>Download Completed Tool</span>
       </button>
+
+      <label id="ssEmbedToggle" class="flex items-center space-x-2 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-xs text-gray-300 font-medium px-3.5 py-2 rounded-lg cursor-pointer transition-all" title="When checked, downloaded tools get the StickShift trigger button, onboarding panel, and companion skill embedded.">
+        <input type="checkbox" id="ssEmbedCheckbox" class="accent-purple-500 h-3.5 w-3.5 cursor-pointer" checked>
+        <span class="select-none">Embed StickShift</span>
+      </label>
 
       <button id="ss-open" class="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-lg shadow-purple-500/10 border border-purple-400/20 cursor-pointer transition-all">
         <svg class="w-3.5 h-3.5 text-purple-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m12 8-4 4h8z"/></svg>
@@ -569,6 +573,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
       <div class="flex border-b border-[#222227] mb-4">
         <button id="ss-tab-yes" class="flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none">Yes, I use StickShift</button>
         <button id="ss-tab-no" class="flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none">No, standalone mode</button>
+        <button id="ss-tab-skill" class="flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none">Skill Template</button>
       </div>
 
       <!-- Branch A: Yes, I use StickShift -->
@@ -602,6 +607,21 @@ Check your Browserslist config to be sure that your targets are set up correctly
           <span class="block font-semibold text-white">Export Work</span>
           <p class="text-gray-400 text-[10px] leading-relaxed">Write or modify your HTML/CSS/JavaScript inside the editor. Review it in the real-time preview canvas, and click <strong>Download Completed Tool</strong> to save the work directly as a single compiled HTML tool back to your computer.</p>
         </div>
+      </div>
+
+      <!-- Branch C: Companion Skill Template Editor -->
+      <div id="ss-content-skill" class="hidden space-y-3 text-[11px] text-gray-300">
+        <div class="space-y-1">
+          <span class="block font-semibold text-white">Companion Skill Template</span>
+          <p class="text-gray-400 text-[10px] leading-relaxed">This markdown is embedded into every downloaded tool (when <strong>Embed StickShift</strong> is checked) and becomes that tool's companion skill. Edit it to teach your agent more than the basic HTML open call. Placeholders are filled per tool at download time: <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{TOOL_TITLE}}</code> <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{TOOL_FILE}}</code> <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{SKILL_SLUG}}</code></p>
+        </div>
+        <textarea id="ss-skill-template-input" spellcheck="false" class="w-full h-56 bg-[#0f0f11] border border-[#2a2a35] rounded-lg p-3 text-[10px] font-mono text-gray-300 focus:outline-none focus:border-purple-500/50 resize-y" placeholder="Companion skill markdown..."></textarea>
+        <div class="flex items-center space-x-2">
+          <button id="ss-skill-template-save" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 rounded-lg transition-all cursor-pointer text-[11px] focus:outline-none">Save Template</button>
+          <button id="ss-skill-template-reset" class="flex-1 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-gray-300 font-medium py-2 rounded-lg transition-all cursor-pointer text-[11px] focus:outline-none">Reset to Default</button>
+        </div>
+        <p id="ss-skill-template-status" class="text-[9px] text-gray-500 font-mono h-3"></p>
+        <p class="text-[9px] text-gray-500 leading-relaxed">Saved in this browser (localStorage) and applied to all future downloads. Any raw closing script tag in the template is auto-escaped on embed so it cannot break the exported file.</p>
       </div>
     </div>
   </div>
@@ -3313,6 +3333,13 @@ Prism.languages.js = Prism.languages.javascript;
       ssContentYes: document.getElementById('ss-content-yes'),
       ssContentNo: document.getElementById('ss-content-no'),
       ssCopySkill: document.getElementById('ss-copy-skill'),
+      ssEmbedCheckbox: document.getElementById('ssEmbedCheckbox'),
+      ssTabSkill: document.getElementById('ss-tab-skill'),
+      ssContentSkill: document.getElementById('ss-content-skill'),
+      ssSkillTemplateInput: document.getElementById('ss-skill-template-input'),
+      ssSkillTemplateSave: document.getElementById('ss-skill-template-save'),
+      ssSkillTemplateReset: document.getElementById('ss-skill-template-reset'),
+      ssSkillTemplateStatus: document.getElementById('ss-skill-template-status'),
       toggleLibPackerBtn: document.getElementById('toggleLibPackerBtn'),
       libPackerDrawer: document.getElementById('libPackerDrawer'),
       libPackerContent: document.getElementById('libPackerContent'),
@@ -3647,6 +3674,137 @@ Prism.languages.js = Prism.languages.javascript;
 
     // Standalone File Export
     // Inject StickShift compliance components into the output HTML if not already present
+    // ---------------------------------------------------------------
+    // StickShift export settings (persisted in this browser)
+    // ---------------------------------------------------------------
+    const SS_KEYS = { embed: 'htmlide-ss-embed', skillTemplate: 'htmlide-ss-skill-template' };
+    function ssGetSetting(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+    function ssSetSetting(key, value) { try { if (value === null) { localStorage.removeItem(key); } else { localStorage.setItem(key, value); } } catch (e) {} }
+
+    // Default companion skill markdown embedded into downloaded tools.
+    // {{TOOL_TITLE}}, {{TOOL_FILE}} and {{SKILL_SLUG}} are substituted per
+    // tool at download time. A custom template saved from the StickShift
+    // panel (Skill Template tab) overrides this default.
+    const DEFAULT_SKILL_TEMPLATE = `---
+okf_version: "0.1"
+type: Skill
+title: {{TOOL_TITLE}} Code Updater
+description: Modify, edit, or refactor code in the {{TOOL_TITLE}} HTML tool using SEARCH/REPLACE update packets and offline library stem tags.
+tags: [skill, html-tool, code-editor]
+---
+
+# {{SKILL_SLUG}}
+
+## Purpose
+Use this skill to modify code inside the active {{TOOL_TITLE}} HTML tool.
+
+## Available Offline Libraries
+The tool workspace supports offline library stems. You can request any of these libraries to be packed by simply writing its Stem Tag in the HTML:
+- Alpine.js: &lt;script id="lib-alpine-stem"&gt;&lt;/script&gt;
+- Pico.css: &lt;link rel="stylesheet" id="lib-picocss-stem"&gt;
+- JSZip: &lt;script id="lib-jszip-stem"&gt;&lt;/script&gt;
+- docxtemplater: &lt;script id="lib-docxtemplater-stem"&gt;&lt;/script&gt;
+- docx: &lt;script id="lib-docx-stem"&gt;&lt;/script&gt;
+- Mammoth.js: &lt;script id="lib-mammoth-stem"&gt;&lt;/script&gt;
+- SheetJS (xlsx): &lt;script id="lib-sheetjs-stem"&gt;&lt;/script&gt;
+- PptxGenJS: &lt;script id="lib-pptxgen-stem"&gt;&lt;/script&gt;
+- PDF.js: &lt;script id="lib-pdfjs-stem"&gt;&lt;/script&gt;
+
+*IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag.
+
+## How the Agent Edits Code
+Generate one or more SEARCH/REPLACE blocks. The user pastes them into the AI Update Drawer.
+
+### Format
+SEARCH:
+[exact code to find]
+REPLACE:
+[replacement code]
+
+### Rules
+1. SEARCH must match exactly — whitespace included.
+2. Include 2-3 lines of surrounding context.
+3. Stack multiple blocks for multiple edits.
+
+## How to open the tool
+<HTML_OPEN>
+tool: {{TOOL_FILE}}
+include:
+- skills/{{SKILL_SLUG}}.md
+</HTML_OPEN>
+
+Instruction: "Copy the block above and click Open HTML Tool in StickShift."`;
+
+    // Resolve the active skill template (custom override or built-in
+    // default) and substitute the per-tool placeholders.
+    function renderSkillMarkdown(toolFileName, skillSlug, toolTitle) {
+      const custom = ssGetSetting(SS_KEYS.skillTemplate);
+      const template = (custom && custom.trim()) ? custom : DEFAULT_SKILL_TEMPLATE;
+      return template
+        .replace(/\{\{TOOL_TITLE\}\}/g, toolTitle)
+        .replace(/\{\{TOOL_FILE\}\}/g, toolFileName)
+        .replace(/\{\{SKILL_SLUG\}\}/g, skillSlug)
+        // A raw closing script tag inside the skill text would terminate the
+        // embedding markdown data block early and dump the remainder of the
+        // exported file into the page as text. Escape it defensively.
+        .replace(/<\/script/gi, '<\\/script');
+    }
+
+    // Detect literal closing-script sequences hiding inside JS strings or
+    // template literals. The HTML parser ends a script block at the FIRST
+    // closing sequence it sees — even mid-string — so an unescaped one in
+    // generated code always corrupts the exported file: the script
+    // terminates early and the rest of the JS renders as page text.
+    // Returns an array of {line, snippet} findings.
+    function detectScriptBreakouts(html) {
+      const findings = [];
+      const lowerHtml = html.toLowerCase();
+      const openRe = /<script\b[^>]*>/gi;
+      let openMatch;
+      while ((openMatch = openRe.exec(html)) !== null) {
+        const openTag = openMatch[0];
+        const blockStart = openRe.lastIndex;
+        const closeIdx = lowerHtml.indexOf('<\/script', blockStart);
+        const blockEnd = closeIdx === -1 ? html.length : closeIdx;
+
+        // Skip non-executing data blocks and the packed library vault
+        // (known-good upstream dists that may confuse the string scanner)
+        const isDataBlock = /type\s*=\s*["']?(?:text\/(?:plain|markdown)|application\/json)/i.test(openTag);
+        const isPackedLib = /id\s*=\s*["'](?:injected-)?lib-/i.test(openTag);
+
+        if (!isDataBlock && !isPackedLib) {
+          const js = html.slice(blockStart, blockEnd);
+          let mode = null; // null | quote char | 'L' line comment | 'B' block comment
+          for (let i = 0; i < js.length; i++) {
+            const c = js[i];
+            const n = js[i + 1];
+            if (mode === null) {
+              if (c === '"' || c === "'" || c === '`') { mode = c; }
+              else if (c === '/' && n === '/') { mode = 'L'; i++; }
+              else if (c === '/' && n === '*') { mode = 'B'; i++; }
+            } else if (mode === 'L') {
+              if (c === '\n') { mode = null; }
+            } else if (mode === 'B') {
+              if (c === '*' && n === '/') { mode = null; i++; }
+            } else {
+              if (c === '\\') { i++; }
+              else if (c === mode) { mode = null; }
+              else if (c === '\n' && mode !== '`') { mode = null; }
+            }
+          }
+          // If the block ends while still inside a string or template
+          // literal, the closing sequence chopped that literal — the author
+          // intended it as text, and the browser will break the file there.
+          if (mode === '"' || mode === "'" || mode === '`') {
+            const line = html.slice(0, blockEnd).split('\n').length;
+            findings.push({ line: line, snippet: js.slice(-90).replace(/\s+/g, ' ').trim() });
+          }
+        }
+        openRe.lastIndex = blockEnd + 1;
+      }
+      return findings;
+    }
+
     function injectStickShiftCompliance(html, toolFileName) {
       // Already compliant — don't double-inject
       if (html.includes('stickshift-skill') || html.includes('STICKSHIFT_TOOL')) return html;
@@ -3717,55 +3875,7 @@ Prism.languages.js = Prism.languages.javascript;
   <!-- STICKSHIFT_SKILL_START -->
   <!-- StickShift Embedded Companion Skill -->
   <script type="text/markdown" id="stickshift-skill" data-skill-slug="${skillSlug}">
----
-okf_version: "0.1"
-type: Skill
-title: ${toolTitle} Code Updater
-description: Modify, edit, or refactor code in the ${toolTitle} HTML tool using SEARCH/REPLACE update packets and offline library stem tags.
-tags: [skill, html-tool, code-editor]
----
-
-# ${skillSlug}
-
-## Purpose
-Use this skill to modify code inside the active ${toolTitle} HTML tool.
-
-## Available Offline Libraries
-The tool workspace supports offline library stems. You can request any of these libraries to be packed by simply writing its Stem Tag in the HTML:
-- Alpine.js: &lt;script id="lib-alpine-stem"&gt;&lt;/script&gt;
-- Pico.css: &lt;link rel="stylesheet" id="lib-picocss-stem"&gt;
-- JSZip: &lt;script id="lib-jszip-stem"&gt;&lt;/script&gt;
-- docxtemplater: &lt;script id="lib-docxtemplater-stem"&gt;&lt;/script&gt;
-- docx: &lt;script id="lib-docx-stem"&gt;&lt;/script&gt;
-- Mammoth.js: &lt;script id="lib-mammoth-stem"&gt;&lt;/script&gt;
-- SheetJS (xlsx): &lt;script id="lib-sheetjs-stem"&gt;&lt;/script&gt;
-- PptxGenJS: &lt;script id="lib-pptxgen-stem"&gt;&lt;/script&gt;
-- PDF.js: &lt;script id="lib-pdfjs-stem"&gt;&lt;/script&gt;
-
-*IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag.
-
-## How the Agent Edits Code
-Generate one or more SEARCH/REPLACE blocks. The user pastes them into the AI Update Drawer.
-
-### Format
-SEARCH:
-[exact code to find]
-REPLACE:
-[replacement code]
-
-### Rules
-1. SEARCH must match exactly — whitespace included.
-2. Include 2-3 lines of surrounding context.
-3. Stack multiple blocks for multiple edits.
-
-## How to open the tool
-<HTML_OPEN>
-tool: ${toolFileName}
-include:
-- skills/${skillSlug}.md
-</HTML_OPEN>
-
-Instruction: "Copy the block above and click Open HTML Tool in StickShift."
+${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
   <\/script>
   <!-- STICKSHIFT_SKILL_END -->`;
 
@@ -3788,13 +3898,20 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."
   <\/script>
   <!-- STICKSHIFT_JS_END -->`;
 
-      // Inject CSS into <head>
-      html = html.replace(/(<\/head>)/i, (match) => ssCSS + '\n' + match);
-
-      // Inject trigger button + panel + skill + JS before </body>
-      html = html.replace(/(<\/body>)/i, (match) => ssTrigger + '\n' + ssPanel + '\n' + ssSkill + '\n' + ssJS + '\n' + match);
-
-      return html;
+      // Inject everything (styles included — valid inside body) as ONE block
+      // anchored at the LAST closing body tag in the document.
+      //
+      // The previous first-match regex replace could anchor on a closing
+      // body tag that lives inside a JS string or template literal in the
+      // tool's own script (common in tools that build HTML documents). The
+      // payload's real closing script tags then terminated the host script
+      // early, and the rest of the tool's JS rendered as page text.
+      const ssPayload = ssCSS + '\n' + ssTrigger + '\n' + ssPanel + '\n' + ssSkill + '\n' + ssJS + '\n';
+      const lowerHtml = html.toLowerCase();
+      let anchor = lowerHtml.lastIndexOf('<\/body>');
+      if (anchor === -1) { anchor = lowerHtml.lastIndexOf('<\/html>'); }
+      if (anchor === -1) { return html + ssPayload; }
+      return html.slice(0, anchor) + ssPayload + html.slice(anchor);
     }
 
     // Pack Offline Libraries UI Event Handlers
@@ -3824,8 +3941,25 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."
       let finalCode = packLibraries(state.code);
 
       const fileName = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
-      finalCode = injectStickShiftCompliance(finalCode, fileName);
-      
+
+      // StickShift compliance is opt-in via the header checkbox
+      if (elements.ssEmbedCheckbox && elements.ssEmbedCheckbox.checked) {
+        finalCode = injectStickShiftCompliance(finalCode, fileName);
+      }
+
+      // Guard against closing-script sequences hiding inside JS strings —
+      // these silently corrupt the exported file when a browser parses it
+      const breakouts = detectScriptBreakouts(finalCode);
+      if (breakouts.length > 0) {
+        const detail = breakouts.map(b => 'Line ~' + b.line + ': ...' + b.snippet).join('\n');
+        const proceed = confirm(
+          'Warning: the compiled output likely contains a closing script tag inside a JS string or template literal.\n\n' +
+          'Browsers terminate a script block at the first one they see — even mid-string — so the downloaded tool will break there and render its remaining code as page text.\n\n' +
+          'Fix: escape it in your code as <\\/script>.\n\n' + detail + '\n\nDownload anyway?'
+        );
+        if (!proceed) { return; }
+      }
+
       const blob = new Blob([finalCode], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       
@@ -4036,20 +4170,64 @@ REPLACE:
       }
     });
 
-    // Onboarding Panel Tabs Toggle
-    elements.ssTabYes.addEventListener('click', () => {
-      elements.ssTabYes.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none";
-      elements.ssTabNo.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none";
-      elements.ssContentYes.classList.remove('hidden');
-      elements.ssContentNo.classList.add('hidden');
+    // Onboarding Panel Tabs Toggle (Yes / No / Skill Template)
+    const SS_TAB_ACTIVE = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none";
+    const SS_TAB_IDLE = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none";
+
+    function activateSsTab(which) {
+      const tabs = [
+        [elements.ssTabYes, elements.ssContentYes, 'yes'],
+        [elements.ssTabNo, elements.ssContentNo, 'no'],
+        [elements.ssTabSkill, elements.ssContentSkill, 'skill']
+      ];
+      tabs.forEach((entry) => {
+        const tab = entry[0], content = entry[1], name = entry[2];
+        const active = name === which;
+        tab.className = active ? SS_TAB_ACTIVE : SS_TAB_IDLE;
+        content.classList.toggle('hidden', !active);
+      });
+      if (which === 'skill') { loadSkillTemplateIntoEditor(); }
+    }
+
+    elements.ssTabYes.addEventListener('click', () => activateSsTab('yes'));
+    elements.ssTabNo.addEventListener('click', () => activateSsTab('no'));
+    elements.ssTabSkill.addEventListener('click', () => activateSsTab('skill'));
+
+    // Companion Skill Template editor
+    function loadSkillTemplateIntoEditor() {
+      const custom = ssGetSetting(SS_KEYS.skillTemplate);
+      elements.ssSkillTemplateInput.value = (custom && custom.trim()) ? custom : DEFAULT_SKILL_TEMPLATE;
+    }
+
+    function flashSkillTemplateStatus(msg) {
+      elements.ssSkillTemplateStatus.textContent = msg;
+      setTimeout(() => { elements.ssSkillTemplateStatus.textContent = ''; }, 2500);
+    }
+
+    elements.ssSkillTemplateSave.addEventListener('click', () => {
+      const value = elements.ssSkillTemplateInput.value;
+      if (!value.trim() || value === DEFAULT_SKILL_TEMPLATE) {
+        ssSetSetting(SS_KEYS.skillTemplate, null);
+        flashSkillTemplateStatus(value.trim() ? 'Matches default — using built-in template.' : 'Cleared — using built-in template.');
+      } else {
+        ssSetSetting(SS_KEYS.skillTemplate, value);
+        flashSkillTemplateStatus('Saved. Applied to all future downloads.');
+      }
     });
 
-    elements.ssTabNo.addEventListener('click', () => {
-      elements.ssTabNo.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none";
-      elements.ssTabYes.className = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none";
-      elements.ssContentNo.classList.remove('hidden');
-      elements.ssContentYes.classList.add('hidden');
+    elements.ssSkillTemplateReset.addEventListener('click', () => {
+      ssSetSetting(SS_KEYS.skillTemplate, null);
+      elements.ssSkillTemplateInput.value = DEFAULT_SKILL_TEMPLATE;
+      flashSkillTemplateStatus('Reset to default.');
     });
+
+    // Embed StickShift checkbox — restore persisted preference, default ON
+    if (elements.ssEmbedCheckbox) {
+      elements.ssEmbedCheckbox.checked = ssGetSetting(SS_KEYS.embed) !== '0';
+      elements.ssEmbedCheckbox.addEventListener('change', () => {
+        ssSetSetting(SS_KEYS.embed, elements.ssEmbedCheckbox.checked ? '1' : '0');
+      });
+    }
 
     // Copy Companion Skill Code
     elements.ssCopySkill.addEventListener('click', () => {
