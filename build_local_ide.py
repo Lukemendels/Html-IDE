@@ -15,6 +15,7 @@ TAILWIND_CACHE_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "tailwind-cdn-
 PRISM_CSS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "themes", "prism-tomorrow.min.css")
 PRISM_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "prism.js")
 CODEJAR_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "codejar", "dist", "codejar.js")
+PATCH_ENGINE_JS_PATH = os.path.join(WORKSPACE_DIR, "scripts", "patch-engine.cjs")
 
 # Offline library vault paths — resolved from locally installed npm packages
 LIB_PATHS = {
@@ -90,6 +91,14 @@ def load_lib(token, path):
         print(f"  WARNING: {token} not found at {path} — embedding empty stub")
         return f"/* {token} not bundled — run npm install */\nconsole.warn('{token} not loaded');"
 
+def escape_script_data_block(content):
+    """Keep library text safe inside HTML <script> data blocks."""
+    return re.sub(r"</script", r"<\\/script", content, flags=re.IGNORECASE)
+
+def escape_style_data_block(content):
+    """Keep CSS text safe inside HTML <style> data blocks."""
+    return re.sub(r"</style", r"<\\/style", content, flags=re.IGNORECASE)
+
 def main():
     if not os.path.exists(TEMPLATE_PATH):
         print(f"Error: Template file not found at {TEMPLATE_PATH}")
@@ -110,6 +119,10 @@ def main():
         codejar_js = f.read()
     codejar_js = codejar_js.replace("export function CodeJar", "function CodeJar")
 
+    print(f"Reading patch engine JS: {PATCH_ENGINE_JS_PATH}")
+    with open(PATCH_ENGINE_JS_PATH, "r", encoding="utf-8") as f:
+        patch_engine_js = f.read()
+
     print("Loading offline library vault...")
     libs = {}
     for token, path in LIB_PATHS.items():
@@ -124,9 +137,14 @@ def main():
     html_content = html_content.replace("/* {{prism_css}} */", prism_css)
     html_content = html_content.replace("/* {{codejar_js}} */", codejar_js)
     html_content = html_content.replace("/* {{prism_js}} */", prism_js)
+    html_content = html_content.replace("/* {{patch_engine_js}} */", patch_engine_js)
 
     print("Inlining offline library vault...")
     for token, content in libs.items():
+        if token == "lib_picocss":
+            content = escape_style_data_block(content)
+        else:
+            content = escape_script_data_block(content)
         placeholder = f"/* {{{{{token}}}}} */"
         html_content = html_content.replace(placeholder, content)
 
