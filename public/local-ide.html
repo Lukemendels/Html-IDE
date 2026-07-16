@@ -486,6 +486,17 @@ Check your Browserslist config to be sure that your targets are set up correctly
             </div>
           </div>
 
+          <div class="rounded-xl border border-[#24242d] bg-[#141418] p-3 space-y-2">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Current editable source hash</p>
+                <p id="sourceHashText" class="text-[10px] text-gray-300 font-mono truncate">sha256:calculating…</p>
+              </div>
+              <button id="copyPatchContextBtn" class="shrink-0 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-gray-300 text-[10px] font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-all" title="Copy source hash, editable HTML, library stems, and v2 output contract">Copy Patch Context</button>
+            </div>
+            <p class="text-[9px] text-gray-500">Use this context for iteration mode. The hash is calculated from the exact editable source string that patch preflight validates.</p>
+          </div>
+
           <div class="flex items-center justify-between">
             <div class="text-[10px] text-gray-500">
               <a href="#" id="loadExamplePacket" class="text-purple-400 hover:underline">Load Example Packet</a>
@@ -635,7 +646,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
 okf_version: "0.1"
 type: Skill
 title: Local HTML IDE Code Updater
-description: Modify, edit, or refactor HTML, CSS, and JS code in the Local HTML IDE workspace using SEARCH/REPLACE update packets and offline library stem tags.
+description: Modify, edit, or refactor HTML, CSS, and JS code in the Local HTML IDE workspace using structured html-ide-patch v2 packets and offline library stem tags.
 tags: [skill, html-tool, code-editor]
 ---
 
@@ -680,7 +691,7 @@ For edits to an existing app, generate a structured JSON `html-ide-patch` versio
 }
 
 ### Rules for Generating Packets:
-1. **Exact Matches**: The `matching.search` text must match exactly unless a controlled strategy is explicitly requested.
+1. **Exact Matches Only**: In v2.0, `matching.strategy` must be `exact`; do not request indentation or whitespace-normalized matching.
 2. **No Ambiguity**: If a search block appears more than once, add stable surrounding context or use a named region; do not rely on first occurrence.
 3. **Atomicity**: All patches must be valid together. One bad patch rejects the whole packet.
 4. **Library Safety**: Insert Stem Tags for libraries; never paste full bundled library payloads.
@@ -3176,6 +3187,193 @@ Prism.languages.js = Prism.languages.javascript;
 
 }());
 
+    (function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.HtmlIdePatchEngine = factory();
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  const PATCH_HISTORY_LIMIT = 20;
+  const SUPPORTED_OPERATIONS = ['replace', 'insert_before', 'insert_after', 'delete', 'replace_region'];
+
+  function normalizeNewlines(text) { return String(text || '').replace(/\r\n?/g, '\n'); }
+  async function sha256Hex(text) {
+    if (typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined') {
+      const bytes = new TextEncoder().encode(text);
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    if (typeof require === 'function') return require('crypto').createHash('sha256').update(text, 'utf8').digest('hex');
+    throw new Error('SHA-256 is unavailable in this environment.');
+  }
+  async function sourceHash(source) { return 'sha256:' + await sha256Hex(source); }
+  function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
+
+  function parseLegacySearchReplace(packetText) {
+    const lines = normalizeNewlines(packetText).split('\n');
+    let blocks = [], currentBlock = null, stateMode = 'IDLE';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === 'SEARCH:') {
+        if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
+        currentBlock = { search: '', replace: '' };
+        stateMode = 'SEARCH';
+        continue;
+      }
+      if (trimmed === 'REPLACE:' && stateMode === 'SEARCH' && currentBlock) { stateMode = 'REPLACE'; continue; }
+      if (stateMode === 'SEARCH' && currentBlock) currentBlock.search += line + '\n';
+      if (stateMode === 'REPLACE' && currentBlock) currentBlock.replace += line + '\n';
+    }
+    if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
+    blocks = blocks.map((b, i) => ({ id: 'legacy-' + (i + 1), operation: 'replace', matching: { strategy: 'exact', expectedMatches: 1, search: b.search.slice(0, -1) }, replacement: b.replace.slice(0, -1) }));
+    if (!blocks.length) throw new Error('No valid structured JSON packet or legacy SEARCH:/REPLACE: blocks were found.');
+    return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
+  }
+
+  function parsePatchPacket(packetText) {
+    const trimmed = String(packetText || '').trim();
+    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
+    let parsed;
+    try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
+    if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
+    if (parsed.version !== '2.0') throw new Error('Unsupported html-ide-patch version: ' + (parsed.version || '(missing)'));
+    if (!parsed.target || typeof parsed.target.sourceHash !== 'string') throw new Error('Structured patches require target.sourceHash.');
+    if (!Array.isArray(parsed.patches) || parsed.patches.length === 0) throw new Error('Structured patches require a non-empty patches array.');
+    const ids = new Set();
+    parsed.patches.forEach((patch, idx) => {
+      const label = 'Patch #' + (idx + 1);
+      if (!patch || typeof patch !== 'object') throw new Error(label + ' must be an object.');
+      if (!patch.id || typeof patch.id !== 'string') throw new Error(label + ' requires a string id.');
+      if (ids.has(patch.id)) throw new Error('Duplicate patch id: ' + patch.id);
+      ids.add(patch.id);
+      if (!SUPPORTED_OPERATIONS.includes(patch.operation)) throw new Error('Patch ' + patch.id + ' has unsupported operation: ' + patch.operation);
+      if (!patch.matching || typeof patch.matching !== 'object') throw new Error('Patch ' + patch.id + ' requires matching.');
+      if ((patch.matching.strategy || 'exact') !== 'exact') throw new Error('Patch ' + patch.id + ' has unsupported matching strategy for v2.0: ' + patch.matching.strategy + '. Use exact.');
+      if (!Number.isInteger(patch.matching.expectedMatches) || patch.matching.expectedMatches < 1) throw new Error('Patch ' + patch.id + ' requires expectedMatches >= 1.');
+      if (patch.operation === 'replace_region') {
+        if (!patch.matching.region || typeof patch.matching.region !== 'string') throw new Error('Patch ' + patch.id + ' replace_region requires matching.region.');
+      } else if (typeof patch.matching.search !== 'string' || patch.matching.search.length === 0) {
+        throw new Error('Patch ' + patch.id + ' requires a non-empty matching.search string.');
+      }
+    });
+    return parsed;
+  }
+
+  function findExactMatches(source, search) {
+    const matches = [];
+    let idx = source.indexOf(search);
+    while (idx !== -1) {
+      matches.push({ start: idx, end: idx + search.length });
+      idx = source.indexOf(search, idx + Math.max(1, search.length));
+    }
+    return matches;
+  }
+
+  function findMarkerPositions(source, marker) {
+    const positions = [];
+    let idx = source.indexOf(marker);
+    while (idx !== -1) { positions.push(idx); idx = source.indexOf(marker, idx + marker.length); }
+    return positions;
+  }
+
+  function resolveRegion(source, patch) {
+    const name = patch.matching.region;
+    const startMarker = '<!-- HTML_IDE_REGION:' + name + ':start -->';
+    const endMarker = '<!-- HTML_IDE_REGION:' + name + ':end -->';
+    const starts = findMarkerPositions(source, startMarker);
+    const ends = findMarkerPositions(source, endMarker);
+    const expected = patch.matching.expectedMatches;
+    if (starts.length !== expected || ends.length !== expected) {
+      return { ok: false, error: 'Expected ' + expected + ' region(s), found ' + starts.length + ' start marker(s) and ' + ends.length + ' end marker(s).', matches: [] };
+    }
+    const events = starts.map(pos => ({ type: 'start', pos })).concat(ends.map(pos => ({ type: 'end', pos }))).sort((a, b) => a.pos - b.pos || (a.type === 'end' ? -1 : 1));
+    let depth = 0, start = null;
+    const matches = [];
+    for (const event of events) {
+      if (event.type === 'start') {
+        if (depth !== 0) return { ok: false, error: 'Nested or duplicate start marker for region ' + name + '.', matches: [] };
+        depth = 1; start = event.pos;
+      } else {
+        if (depth !== 1 || start === null) return { ok: false, error: 'Missing or reversed start marker for region ' + name + '.', matches: [] };
+        const contentStart = start + startMarker.length;
+        const contentEnd = event.pos;
+        if (contentEnd < contentStart) return { ok: false, error: 'Reversed markers for region ' + name + '.', matches: [] };
+        matches.push({ start: contentStart, end: contentEnd, markerStart: start, markerEnd: event.pos + endMarker.length });
+        depth = 0; start = null;
+      }
+    }
+    if (depth !== 0) return { ok: false, error: 'Unpaired start marker for region ' + name + '.', matches: [] };
+    return { ok: true, matches };
+  }
+
+  function resolvePatch(source, patch) {
+    if (patch.operation === 'replace_region') return resolveRegion(source, patch);
+    const matches = findExactMatches(source, patch.matching.search);
+    if (matches.length !== patch.matching.expectedMatches) return { ok: false, error: 'Expected ' + patch.matching.expectedMatches + ' match(es), found ' + matches.length, matches };
+    return { ok: true, matches };
+  }
+
+  function collectRanges(resolvedItems) {
+    const ranges = [];
+    for (const item of resolvedItems) for (const match of item.resolution.matches) ranges.push({ patchId: item.patch.id, start: match.start, end: match.end, patch: item.patch, match });
+    ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+    for (let i = 1; i < ranges.length; i++) {
+      const prev = ranges[i - 1], cur = ranges[i];
+      if (cur.start < prev.end) throw new Error('Overlapping patch ranges rejected: ' + prev.patchId + ' conflicts with ' + cur.patchId + '.');
+    }
+    return ranges;
+  }
+
+  function applyResolved(source, resolvedItems) {
+    let output = source;
+    const ordered = collectRanges(resolvedItems).sort((a, b) => b.start - a.start);
+    for (const item of ordered) {
+      const patch = item.patch, match = item.match;
+      const replacement = patch.operation === 'delete' ? '' : (patch.replacement || '');
+      if (patch.operation === 'insert_before') output = output.slice(0, match.start) + replacement + output.slice(match.start);
+      else if (patch.operation === 'insert_after') output = output.slice(0, match.end) + replacement + output.slice(match.end);
+      else output = output.slice(0, match.start) + replacement + output.slice(match.end);
+    }
+    return output;
+  }
+
+  async function preflightPatchPacket(packetText, source) {
+    const packet = parsePatchPacket(packetText);
+    const currentHash = await sourceHash(source);
+    if (!packet.legacy && packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
+    const resolvedItems = [];
+    for (const patch of packet.patches) {
+      const resolution = resolvePatch(source, patch);
+      if (!resolution.ok) throw new Error('Patch ' + patch.id + ' failed preflight: ' + resolution.error);
+      resolvedItems.push({ patch, resolution });
+    }
+    collectRanges(resolvedItems);
+    const output = applyResolved(source, resolvedItems);
+    const nextHash = await sourceHash(output);
+    return { packet, currentHash, nextHash, output, resolvedItems };
+  }
+
+  function summarizePreflight(report, source) {
+    const lines = [(report.packet.legacy ? 'Legacy SEARCH/REPLACE compatibility packet' : 'Structured html-ide-patch v2 packet'), 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
+    report.resolvedItems.forEach(item => {
+      const ranges = item.resolution.matches.map(m => 'line ' + lineFromIndex(source, m.start) + ', chars ' + m.start + '-' + m.end).join('; ');
+      lines.push('- ' + item.patch.id + ' [' + item.patch.operation + '] ' + ranges);
+    });
+    if (report.packet.legacy) lines.push('Warning: legacy packets do not include source hashes and are less safe than v2 JSON packets.');
+    return lines.join('\n');
+  }
+
+  function createHistory(limit) {
+    const items = [];
+    return {
+      push(tx) { items.push(tx); while (items.length > (limit || PATCH_HISTORY_LIMIT)) items.shift(); },
+      pop() { return items.pop(); },
+      size() { return items.length; },
+      entries() { return items.slice(); }
+    };
+  }
+
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+});
+
 
     // Global Application State
     const state = {
@@ -3184,56 +3382,58 @@ Prism.languages.js = Prism.languages.javascript;
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Minimalist Pomodoro Clock</title>
-
-  <!-- Modern Tailwind styles will render in our live pane -->
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <title>Offline Pomodoro Clock</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at top, #1e3a8a55, transparent 38%), #020617; color: #f8fafc; }
+    main { width: min(92vw, 28rem); padding: 2rem; border: 1px solid #1e293b; border-radius: 1.5rem; background: #0f172acc; box-shadow: 0 24px 80px #0008; text-align: center; }
+    h1 { margin: 0 0 .5rem; font-size: 1.75rem; }
+    .subtitle { margin: 0 0 2rem; color: #94a3b8; font-size: .75rem; text-transform: uppercase; letter-spacing: .18em; }
+    .dial { position: relative; width: 16rem; height: 16rem; margin: 0 auto 2rem; display: grid; place-items: center; border-radius: 999px; border: 4px solid #1e293b; }
+    #radialFill { position: absolute; inset: -.25rem; border-radius: 999px; border: 4px solid transparent; border-top-color: #3b82f6; border-right-color: #3b82f6; transform: rotate(45deg); transition: transform .8s ease, border-color .2s ease; }
+    #timerDisplay { position: relative; display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 3rem; font-weight: 800; }
+    #sessionType { position: relative; margin-top: .35rem; color: #60a5fa; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .16em; }
+    .controls { display: flex; justify-content: center; align-items: center; gap: 1rem; }
+    button { border: 0; border-radius: 999px; display: inline-grid; place-items: center; color: #f8fafc; background: #1e293b; cursor: pointer; transition: transform .15s ease, background .15s ease; }
+    button:hover { transform: translateY(-1px); background: #334155; }
+    .small { width: 3rem; height: 3rem; color: #cbd5e1; }
+    .primary { width: 4rem; height: 4rem; background: #2563eb; box-shadow: 0 16px 35px #2563eb33; }
+    .primary.break { background: #0d9488; box-shadow: 0 16px 35px #0d948833; }
+    svg { width: 1.25rem; height: 1.25rem; fill: currentColor; }
+  </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen flex flex-col justify-center items-center font-sans">
+<body>
+  <main>
+    <h1>Focus Session</h1>
+    <p class="subtitle">Time to align and create</p>
 
-  <div class="w-full max-w-md mx-auto p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-md text-center">
-
-    <!-- Title and details -->
-    <h1 class="text-2xl font-bold tracking-tight text-white mb-2">Focus Session</h1>
-    <p class="text-xs text-slate-400 font-medium mb-12 uppercase tracking-widest">Time to align and create</p>
-
-    <!-- Circular Dial Visual -->
-    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
-      <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
-      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45"></div>
-
-      <!-- Time counter -->
-      <div class="z-10">
-        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
-        <div id="sessionType" class="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
+    <section class="dial" aria-live="polite">
+      <div id="radialFill"></div>
+      <div>
+        <span id="timerDisplay">25:00</span>
+        <div id="sessionType">Work Interval</div>
       </div>
-    </div>
+    </section>
 
-    <!-- Clock Control Actions -->
-    <div class="flex items-center justify-center space-x-6">
-      <button id="resetTimer" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all cursor-pointer">
-        <i class="fa-solid fa-rotate-left text-sm"></i>
+    <div class="controls">
+      <button id="resetTimer" class="small" title="Reset timer" aria-label="Reset timer">
+        <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6.5 12 11V8a5 5 0 1 1-4.58 7H4.26A8 8 0 1 0 12 5Z"/></svg>
       </button>
-
-      <button id="playPauseTimer" class="h-16 w-16 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-500/20 scale-100 hover:scale-105 active:scale-95">
-        <i id="playIcon" class="fa-solid fa-play text-lg translate-x-0.5"></i>
+      <button id="playPauseTimer" class="primary" title="Start or pause" aria-label="Start or pause">
+        <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7Z"/></svg>
       </button>
-
-      <button id="toggleSession" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all cursor-pointer">
-        <i class="fa-solid fa-circle-half-stroke text-sm"></i>
+      <button id="toggleSession" class="small" title="Toggle work/break" aria-label="Toggle work or break session">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20V2Zm2.2 2.3A8 8 0 0 1 14.2 19V4.3Z"/></svg>
       </button>
     </div>
-
-  </div>
+  </main>
 
   <script>
-    // Embedded micro clock mechanics
     let timeRemaining = 25 * 60;
     let timerRunning = false;
     let timerInterval = null;
     let isWorkSession = true;
-
     const timerDisplay = document.getElementById('timerDisplay');
     const playPauseBtn = document.getElementById('playPauseTimer');
     const playIcon = document.getElementById('playIcon');
@@ -3241,62 +3441,34 @@ Prism.languages.js = Prism.languages.javascript;
     const toggleSessionBtn = document.getElementById('toggleSession');
     const sessionType = document.getElementById('sessionType');
     const radialFill = document.getElementById('radialFill');
-
+    function iconPath(kind) { return kind === 'pause' ? '<path d="M7 5h4v14H7V5Zm6 0h4v14h-4V5Z"/>' : '<path d="M8 5v14l11-7Z"/>'; }
     function updateDisplay() {
       const minutes = Math.floor(timeRemaining / 60);
       const seconds = timeRemaining % 60;
-      timerDisplay.textContent = \`\${minutes.toString().padStart(2, '0')}:\${seconds.toString().padStart(2, '0')}\`;
-
-      // Rotate radial fill slightly to simulate ticking down
+      timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       const total = isWorkSession ? 25 * 60 : 5 * 60;
-      const progress = (total - timeRemaining) / total;
-      radialFill.style.transform = \`rotate(\${45 + (progress * 360)}deg)\`;
+      radialFill.style.transform = `rotate(${45 + (((total - timeRemaining) / total) * 360)}deg)`;
     }
-
     function toggleTimer() {
-      if (timerRunning) {
-        clearInterval(timerInterval);
-        playIcon.className = "fa-solid fa-play text-lg translate-x-0.5";
-        timerRunning = false;
-      } else {
-        timerInterval = setInterval(() => {
-          if (timeRemaining > 0) {
-            timeRemaining--;
-            updateDisplay();
-          } else {
-            clearInterval(timerInterval);
-            timerRunning = false;
-            playIcon.className = "fa-solid fa-play text-lg translate-x-0.5";
-            alert(isWorkSession ? "Work session completed! Time for a short break." : "Break finished! Back to work.");
-            switchMode();
-          }
-        }, 1000);
-        playIcon.className = "fa-solid fa-pause text-lg";
-        timerRunning = true;
-      }
+      if (timerRunning) { clearInterval(timerInterval); playIcon.innerHTML = iconPath('play'); timerRunning = false; return; }
+      timerInterval = setInterval(() => {
+        if (timeRemaining > 0) { timeRemaining--; updateDisplay(); return; }
+        clearInterval(timerInterval); timerRunning = false; playIcon.innerHTML = iconPath('play'); alert(isWorkSession ? 'Work session completed! Time for a short break.' : 'Break finished! Back to work.'); switchMode();
+      }, 1000);
+      playIcon.innerHTML = iconPath('pause'); timerRunning = true;
     }
-
-    function resetTimer() {
-      clearInterval(timerInterval);
-      timerRunning = false;
-      playIcon.className = "fa-solid fa-play text-lg translate-x-0.5";
-      timeRemaining = isWorkSession ? 25 * 60 : 5 * 60;
-      updateDisplay();
-    }
-
+    function resetTimer() { clearInterval(timerInterval); timerRunning = false; playIcon.innerHTML = iconPath('play'); timeRemaining = isWorkSession ? 25 * 60 : 5 * 60; updateDisplay(); }
     function switchMode() {
       isWorkSession = !isWorkSession;
-      timeRemaining = isWorkSession ? 25 * 60 : 5 * 60;
-      sessionType.textContent = isWorkSession ? "Work Interval" : "Short Break";
-      sessionType.className = isWorkSession ? "text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2" : "text-[10px] text-teal-400 uppercase tracking-widest font-semibold mt-2";
-      playPauseBtn.className = isWorkSession ? "h-16 w-16 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-500/20" : "h-16 w-16 rounded-full bg-teal-600 hover:bg-teal-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-teal-500/20";
+      sessionType.textContent = isWorkSession ? 'Work Interval' : 'Short Break';
+      sessionType.style.color = isWorkSession ? '#60a5fa' : '#2dd4bf';
+      radialFill.style.borderTopColor = radialFill.style.borderRightColor = isWorkSession ? '#3b82f6' : '#14b8a6';
+      playPauseBtn.classList.toggle('break', !isWorkSession);
       resetTimer();
     }
-
     playPauseBtn.addEventListener('click', toggleTimer);
     resetBtn.addEventListener('click', resetTimer);
     toggleSessionBtn.addEventListener('click', switchMode);
-
     updateDisplay();
   <\/script>
 </body>
@@ -3323,6 +3495,8 @@ Prism.languages.js = Prism.languages.javascript;
       aiPacketInput: document.getElementById('aiPacketInput'),
       applyChangesBtn: document.getElementById('applyChangesBtn'),
       undoPatchBtn: document.getElementById('undoPatchBtn'),
+      sourceHashText: document.getElementById('sourceHashText'),
+      copyPatchContextBtn: document.getElementById('copyPatchContextBtn'),
       loadExamplePacket: document.getElementById('loadExamplePacket'),
       toggleAiDrawerBtn: document.getElementById('toggleAiDrawerBtn'),
       aiDrawer: document.getElementById('aiDrawer'),
@@ -3376,6 +3550,7 @@ Prism.languages.js = Prism.languages.javascript;
       syncLineNumbers();
       triggerLivePreview();
       syncLibraryIndicators();
+      refreshSourceHashDisplay();
     });
 
     // Synchronize Scroll between codejar text and line number gutter
@@ -3481,13 +3656,17 @@ Prism.languages.js = Prism.languages.javascript;
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clean Workspace Canvas</title>
-  <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0f19; color: #f3f4f6; font-family: system-ui, sans-serif; }
+    main { max-width: 24rem; padding: 2.5rem; border: 1px solid #1f2937; border-radius: 1rem; background: #111827; text-align: center; }
+    p { color: #9ca3af; }
+  </style>
 </head>
-<body class="bg-[#0b0f19] text-gray-100 flex items-center justify-center min-h-screen">
-  <div class="p-10 rounded-2xl bg-slate-900 border border-slate-800 text-center max-w-sm">
-    <h1 class="text-xl font-bold text-white mb-2">Workspace Reset</h1>
-    <p class="text-xs text-slate-400">Pasted AI modifications or uploaded codes will populate this canvas.</p>
-  </div>
+<body>
+  <main>
+    <h1>Workspace Reset</h1>
+    <p>Pasted AI modifications or uploaded code will populate this canvas.</p>
+  </main>
 </body>
 </html>`;
         state.code = boilerplate;
@@ -3695,7 +3874,7 @@ Prism.languages.js = Prism.languages.javascript;
 okf_version: "0.1"
 type: Skill
 title: {{TOOL_TITLE}} Code Updater
-description: Modify, edit, or refactor code in the {{TOOL_TITLE}} HTML tool using SEARCH/REPLACE update packets and offline library stem tags.
+description: Modify, edit, or refactor code in the {{TOOL_TITLE}} HTML tool using structured html-ide-patch v2 packets and offline library stem tags.
 tags: [skill, html-tool, code-editor]
 ---
 
@@ -3719,18 +3898,27 @@ The tool workspace supports offline library stems. You can request any of these 
 *IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag.
 
 ## How the Agent Edits Code
-Generate one or more SEARCH/REPLACE blocks. The user pastes them into the AI Update Drawer.
+Generate a structured JSON \`html-ide-patch\` version \`2.0\` packet by default. Use the source hash from the user's patch context, unique patch ids, \`matching.strategy: "exact"\`, explicit \`expectedMatches\`, and one of: \`replace\`, \`insert_before\`, \`insert_after\`, \`delete\`, or \`replace_region\`. Legacy SEARCH/REPLACE blocks are accepted only as a compatibility fallback and lack hash protection.
 
 ### Format
-SEARCH:
-[exact code to find]
-REPLACE:
-[replacement code]
+{
+  "protocol": "html-ide-patch",
+  "version": "2.0",
+  "target": { "sourceHash": "sha256:..." },
+  "patches": [
+    {
+      "id": "change-button-label",
+      "operation": "replace",
+      "matching": { "strategy": "exact", "expectedMatches": 1, "search": "<button>Save</button>" },
+      "replacement": "<button>Export</button>"
+    }
+  ]
+}
 
 ### Rules
-1. SEARCH must match exactly — whitespace included.
-2. Include 2-3 lines of surrounding context.
-3. Stack multiple blocks for multiple edits.
+1. Use exact matching only in v2.0.
+2. Reject ambiguity by including enough surrounding context or using a named region.
+3. Never paste full bundled library payloads; insert Stem Tags.
 
 ## How to open the tool
 <HTML_OPEN>
@@ -3942,168 +4130,61 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
     // Initialize Collapsible state for libraries
     elements.libPackerContent.style.maxHeight = '0px';
 
-    elements.downloadBtn.addEventListener('click', () => {
-      // Pack the editor's code directly based on the stems present
-      let finalCode = packLibraries(state.code);
+    // Hardened AI patch engine. The production engine is in scripts/patch-engine.cjs
+    // and is inlined into this standalone file by build_local_ide.py.
+    const patchEngine = window.HtmlIdePatchEngine;
+    const patchHistory = patchEngine.createHistory(patchEngine.PATCH_HISTORY_LIMIT);
+    let sourceHashRefreshToken = 0;
 
-      const fileName = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
+    async function refreshSourceHashDisplay() {
+      const token = ++sourceHashRefreshToken;
+      const hash = await patchEngine.sourceHash(state.code);
+      if (token === sourceHashRefreshToken && elements.sourceHashText) elements.sourceHashText.textContent = hash;
+      return hash;
+    }
 
-      // StickShift compliance is opt-in via the header checkbox
-      if (elements.ssEmbedCheckbox && elements.ssEmbedCheckbox.checked) {
-        finalCode = injectStickShiftCompliance(finalCode, fileName);
+    function availableLibraryStemManifest() {
+      return [
+        'Alpine.js: <script id="lib-alpine-stem"></script>',
+        'Pico.css: <link rel="stylesheet" id="lib-picocss-stem">',
+        'JSZip: <script id="lib-jszip-stem"></script>',
+        'docxtemplater: <script id="lib-docxtemplater-stem"></script>',
+        'docx: <script id="lib-docx-stem"></script>',
+        'Mammoth.js: <script id="lib-mammoth-stem"></script>',
+        'SheetJS (xlsx): <script id="lib-sheetjs-stem"></script>',
+        'PptxGenJS: <script id="lib-pptxgen-stem"></script>',
+        'PDF.js: <script id="lib-pdfjs-stem"></script>'
+      ].join('\n');
+    }
+
+    async function copyPatchContext() {
+      const hash = await refreshSourceHashDisplay();
+      const context = [
+        '# Local HTML IDE patch context',
+        '',
+        '## Current editable source hash',
+        hash,
+        '',
+        '## Available offline library stems',
+        availableLibraryStemManifest(),
+        '',
+        '## Required v2 patch output contract',
+        'Return only JSON. Use protocol "html-ide-patch", version "2.0", target.sourceHash above, unique patch ids, matching.strategy "exact", expectedMatches, and operations replace, insert_before, insert_after, delete, or replace_region.',
+        '',
+        '## Current editable HTML',
+        state.code
+      ].join('\n');
+      await copyText(context);
+      if (elements.copyPatchContextBtn) {
+        const old = elements.copyPatchContextBtn.textContent;
+        elements.copyPatchContextBtn.textContent = 'Copied';
+        setTimeout(() => { elements.copyPatchContextBtn.textContent = old; }, 1200);
       }
-
-      // Guard against closing-script sequences hiding inside JS strings —
-      // these silently corrupt the exported file when a browser parses it
-      const breakouts = detectScriptBreakouts(finalCode);
-      if (breakouts.length > 0) {
-        const detail = breakouts.map(b => 'Line ~' + b.line + ': ...' + b.snippet).join('\n');
-        const proceed = confirm(
-          'Warning: the compiled output likely contains a closing script tag inside a JS string or template literal.\n\n' +
-          'Browsers terminate a script block at the first one they see — even mid-string — so the downloaded tool will break there and render its remaining code as page text.\n\n' +
-          'Fix: escape it in your code as <\\/script>.\n\n' + detail + '\n\nDownload anyway?'
-        );
-        if (!proceed) { return; }
-      }
-
-      const blob = new Blob([finalCode], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    });
-
-    // Hardened AI patch engine. Structured v2 packets are all-or-nothing and
-    // legacy SEARCH/REPLACE packets are kept as a compatibility path.
-    const PATCH_HISTORY_LIMIT = 20;
-    const patchHistory = [];
-
-    function normalizeNewlines(text) { return String(text || '').replace(/\r\n?/g, '\n'); }
-    async function sha256Hex(text) {
-      const bytes = new TextEncoder().encode(text);
-      const digest = await crypto.subtle.digest('SHA-256', bytes);
-      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-    function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
-
-    function parseLegacySearchReplace(packet) {
-      const lines = normalizeNewlines(packet).split('\n');
-      let blocks = [], currentBlock = null, stateMode = 'IDLE';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed === 'SEARCH:') {
-          if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
-          currentBlock = { search: '', replace: '' };
-          stateMode = 'SEARCH';
-          continue;
-        }
-        if (trimmed === 'REPLACE:' && stateMode === 'SEARCH' && currentBlock) { stateMode = 'REPLACE'; continue; }
-        if (stateMode === 'SEARCH' && currentBlock) currentBlock.search += line + '\n';
-        if (stateMode === 'REPLACE' && currentBlock) currentBlock.replace += line + '\n';
-      }
-      if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
-      blocks = blocks.map((b, i) => ({ id: 'legacy-' + (i + 1), operation: 'replace', matching: { strategy: 'exact', expectedMatches: 1, search: b.search.slice(0, -1) }, replacement: b.replace.slice(0, -1) }));
-      if (!blocks.length) throw new Error('No valid structured JSON packet or legacy SEARCH:/REPLACE: blocks were found.');
-      return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
-    }
-
-    function parsePatchPacket(packet) {
-      const trimmed = packet.trim();
-      if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packet);
-      let parsed;
-      try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
-      if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
-      if (parsed.version !== '2.0') throw new Error('Unsupported html-ide-patch version: ' + (parsed.version || '(missing)'));
-      if (!parsed.target || typeof parsed.target.sourceHash !== 'string') throw new Error('Structured patches require target.sourceHash.');
-      if (!Array.isArray(parsed.patches) || parsed.patches.length === 0) throw new Error('Structured patches require a non-empty patches array.');
-      const ids = new Set();
-      parsed.patches.forEach((patch, idx) => {
-        if (!patch || typeof patch !== 'object') throw new Error('Patch #' + (idx + 1) + ' must be an object.');
-        if (!patch.id || typeof patch.id !== 'string') throw new Error('Patch #' + (idx + 1) + ' requires a string id.');
-        if (ids.has(patch.id)) throw new Error('Duplicate patch id: ' + patch.id);
-        ids.add(patch.id);
-        if (!['replace', 'insert_before', 'insert_after', 'delete', 'replace_region'].includes(patch.operation)) throw new Error('Patch ' + patch.id + ' has unsupported operation: ' + patch.operation);
-        if (!patch.matching || typeof patch.matching !== 'object') throw new Error('Patch ' + patch.id + ' requires matching.');
-        if (!['exact', 'trim_trailing_whitespace', 'indentation'].includes(patch.matching.strategy || 'exact')) throw new Error('Patch ' + patch.id + ' has unsupported matching strategy.');
-        if (!Number.isInteger(patch.matching.expectedMatches) || patch.matching.expectedMatches < 1) throw new Error('Patch ' + patch.id + ' requires expectedMatches >= 1.');
-        if (patch.operation === 'replace_region') {
-          if (!patch.matching.region || typeof patch.matching.region !== 'string') throw new Error('Patch ' + patch.id + ' replace_region requires matching.region.');
-        } else if (typeof patch.matching.search !== 'string' || patch.matching.search.length === 0) {
-          throw new Error('Patch ' + patch.id + ' requires a non-empty matching.search string.');
-        }
-      });
-      return parsed;
-    }
-
-    function findExactMatches(source, search) {
-      const matches = [];
-      let idx = source.indexOf(search);
-      while (idx !== -1) { matches.push({ start: idx, end: idx + search.length }); idx = source.indexOf(search, idx + Math.max(1, search.length)); }
-      return matches;
-    }
-
-    function resolvePatch(source, patch) {
-      if (patch.operation === 'replace_region') {
-        const name = patch.matching.region;
-        const startMarker = '<!-- HTML_IDE_REGION:' + name + ':start -->';
-        const endMarker = '<!-- HTML_IDE_REGION:' + name + ':end -->';
-        const start = source.indexOf(startMarker), end = source.indexOf(endMarker);
-        if (start === -1 || end === -1 || end < start) return { ok: false, error: 'Region markers not found for ' + name, matches: [] };
-        return { ok: true, matches: [{ start: start + startMarker.length, end }] };
-      }
-      const search = patch.matching.search;
-      const matches = findExactMatches(source, search);
-      if (matches.length !== patch.matching.expectedMatches) return { ok: false, error: 'Expected ' + patch.matching.expectedMatches + ' match(es), found ' + matches.length, matches };
-      return { ok: true, matches };
-    }
-
-    function applyResolved(source, resolvedItems) {
-      let output = source;
-      const ordered = [];
-      resolvedItems.forEach(item => item.resolution.matches.forEach(match => ordered.push({ patch: item.patch, match })));
-      ordered.sort((a, b) => b.match.start - a.match.start);
-      for (const item of ordered) {
-        const patch = item.patch, match = item.match;
-        const replacement = patch.operation === 'delete' ? '' : (patch.replacement || '');
-        if (patch.operation === 'insert_before') output = output.slice(0, match.start) + replacement + output.slice(match.start);
-        else if (patch.operation === 'insert_after') output = output.slice(0, match.end) + replacement + output.slice(match.end);
-        else output = output.slice(0, match.start) + replacement + output.slice(match.end);
-      }
-      return output;
-    }
-
-    async function preflightPatchPacket(packetText, source) {
-      const packet = parsePatchPacket(packetText);
-      const currentHash = 'sha256:' + await sha256Hex(source);
-      if (!packet.legacy && packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
-      const resolvedItems = [];
-      for (const patch of packet.patches) {
-        const resolution = resolvePatch(source, patch);
-        if (!resolution.ok) throw new Error('Patch ' + patch.id + ' failed preflight: ' + resolution.error);
-        resolvedItems.push({ patch, resolution });
-      }
-      const output = applyResolved(source, resolvedItems);
-      const nextHash = 'sha256:' + await sha256Hex(output);
-      return { packet, currentHash, nextHash, output, resolvedItems };
-    }
-
-    function summarizePreflight(report) {
-      const lines = [(report.packet.legacy ? 'Legacy SEARCH/REPLACE compatibility packet' : 'Structured html-ide-patch v2 packet'), 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
-      report.resolvedItems.forEach(item => {
-        const ranges = item.resolution.matches.map(m => 'line ' + lineFromIndex(state.code, m.start) + ', chars ' + m.start + '-' + m.end).join('; ');
-        lines.push('- ' + item.patch.id + ' [' + item.patch.operation + '] ' + ranges);
-      });
-      if (report.packet.legacy) lines.push('Warning: legacy packets do not include source hashes and are less safe than v2 JSON packets.');
-      return lines.join('\n');
     }
 
     elements.applyChangesBtn.addEventListener('click', applyPacketUpdates);
     elements.undoPatchBtn.addEventListener('click', undoLastPatchTransaction);
+    elements.copyPatchContextBtn.addEventListener('click', copyPatchContext);
     elements.aiPacketInput.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); applyPacketUpdates(); } });
 
     async function applyPacketUpdates() {
@@ -4111,24 +4192,30 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
       if (!packet.trim()) { alert('Please paste a non-empty AI Update Packet first.'); return; }
       try {
         const before = state.code;
-        const report = await preflightPatchPacket(packet, before);
-        if (!confirm('Patch preflight passed. Apply atomically?\n\n' + summarizePreflight(report))) return;
+        const report = await patchEngine.preflightPatchPacket(packet, before);
+        if (!confirm('Patch preflight passed. Apply atomically?\n\n' + patchEngine.summarizePreflight(report, before))) return;
         state.code = report.output;
         patchHistory.push({ before, after: report.output, packet: report.packet, sourceHash: report.currentHash, resultHash: report.nextHash, timestamp: new Date().toISOString(), patchIds: report.packet.patches.map(p => p.id) });
-        while (patchHistory.length > PATCH_HISTORY_LIMIT) patchHistory.shift();
-        jar.updateCode(report.output); syncLineNumbers(); triggerLivePreview(); syncLibraryIndicators();
+        jar.updateCode(report.output); syncLineNumbers(); triggerLivePreview(); syncLibraryIndicators(); refreshSourceHashDisplay();
         elements.aiPacketInput.value = '';
         alert('Applied ' + report.packet.patches.length + ' patch(es) as one transaction.');
       } catch (err) { alert(err.message); }
     }
 
-    function undoLastPatchTransaction() {
+    async function undoLastPatchTransaction() {
       const tx = patchHistory.pop();
       if (!tx) { alert('No patch transaction is available to undo in this session.'); return; }
+      const currentHash = await patchEngine.sourceHash(state.code);
+      if (currentHash !== tx.resultHash) {
+        const proceed = confirm('The editor changed after this patch was applied.\n\nCurrent: ' + currentHash + '\nPatch result: ' + tx.resultHash + '\n\nRestore the pre-patch snapshot anyway?');
+        if (!proceed) { patchHistory.push(tx); return; }
+      }
       state.code = tx.before;
-      jar.updateCode(tx.before); syncLineNumbers(); triggerLivePreview(); syncLibraryIndicators();
+      jar.updateCode(tx.before); syncLineNumbers(); triggerLivePreview(); syncLibraryIndicators(); refreshSourceHashDisplay();
       alert('Undid patch transaction: ' + tx.patchIds.join(', '));
     }
+
+    refreshSourceHashDisplay();
 
     // Initialize Collapsible state for libraries
     elements.libPackerContent.style.maxHeight = '0px';

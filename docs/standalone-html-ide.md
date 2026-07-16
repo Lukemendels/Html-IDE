@@ -41,11 +41,11 @@ Create mode remains a one-shot complete HTML document pasted into the editor. Co
 
 ## Patch mode
 
-Patch mode now accepts structured JSON `html-ide-patch` version `2.0` by default. It requires unique patch ids, `target.sourceHash`, supported operations (`replace`, `insert_before`, `insert_after`, `delete`, `replace_region`), expected match counts, preflight resolution, stale-hash rejection, ambiguity rejection, dry-run summary, atomic application, and an in-session bounded undo stack. Legacy `SEARCH:`/`REPLACE:` packets are still parsed, but they are explicitly warned as lower-safety compatibility packets.
+Patch mode now accepts structured JSON `html-ide-patch` version `2.0` by default. Version 2.0 intentionally supports only exact matching (`matching.strategy: "exact"`) plus named region replacement; the previously listed whitespace-normalized strategies are not accepted until they can be implemented safely. It requires unique patch ids, `target.sourceHash`, supported operations (`replace`, `insert_before`, `insert_after`, `delete`, `replace_region`), expected match counts, preflight resolution, stale-hash rejection, ambiguity and overlap rejection, dry-run summary, atomic application, and an in-session bounded undo stack. The AI drawer displays the current source hash and provides **Copy Patch Context**, which copies the exact editable source string, hash, library stems, and v2 output contract. Legacy `SEARCH:`/`REPLACE:` packets are still parsed, but they are explicitly warned as lower-safety compatibility packets.
 
 ## Storage and recovery
 
-Current durable behavior is limited. The IDE uses localStorage for StickShift companion skill preferences. The main workspace is in memory unless the user downloads/exports a completed tool. IndexedDB, folder-native projects, backup manifests, and File System Access API workflows remain gaps. Do not treat browser storage as authoritative; recovery should be through explicit files, ZIP/project bundles, or user-selected folders where Chrome policy and `file://` secure-context behavior permit.
+Current durable behavior is limited. The IDE uses localStorage for StickShift companion skill preferences. The main workspace is in memory unless the user downloads/exports a completed tool. IndexedDB, folder-native projects, backup manifests, and File System Access API workflows remain gaps and are not implemented by this PR. Do not treat browser storage as authoritative; recovery should be through explicit files, ZIP/project bundles, or user-selected folders where Chrome policy and `file://` secure-context behavior permit.
 
 ## Runtime LLM skill convention
 
@@ -53,4 +53,4 @@ Completed apps can receive an embedded StickShift companion skill. For app-speci
 
 ## Tests and manual smoke checks
 
-Run `node tests/patch-engine.test.cjs`, `node test_export.cjs`, `npm run lint`, and `python3 build_local_ide.py`. Manual Chrome/Linux checks should open the root `local-ide.html` under `file://`, paste a complete HTML app, verify preview, apply a structured patch, verify ambiguous-patch rejection, undo, download the completed app, reopen it offline, and test browser-storage loss/recovery via downloaded files.
+Run `node tests/patch-engine.test.cjs`, `node test_export.cjs`, `npm run lint`, and `python3 build_local_ide.py`. The patch-engine tests execute the same `scripts/patch-engine.cjs` production engine that is inlined into the standalone artifact. Manual Chrome/Linux checks should open the root `local-ide.html` under `file://`, paste a complete HTML app, verify preview, apply a structured patch, verify ambiguous-patch rejection, undo, download the completed app, reopen it offline, and test browser-storage loss/recovery via downloaded files.

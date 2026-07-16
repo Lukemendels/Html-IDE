@@ -15,6 +15,7 @@ TAILWIND_CACHE_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "tailwind-cdn-
 PRISM_CSS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "themes", "prism-tomorrow.min.css")
 PRISM_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "prism.js")
 CODEJAR_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "codejar", "dist", "codejar.js")
+PATCH_ENGINE_JS_PATH = os.path.join(WORKSPACE_DIR, "scripts", "patch-engine.cjs")
 
 # Offline library vault paths — resolved from locally installed npm packages
 LIB_PATHS = {
@@ -110,6 +111,10 @@ def main():
         codejar_js = f.read()
     codejar_js = codejar_js.replace("export function CodeJar", "function CodeJar")
 
+    print(f"Reading patch engine JS: {PATCH_ENGINE_JS_PATH}")
+    with open(PATCH_ENGINE_JS_PATH, "r", encoding="utf-8") as f:
+        patch_engine_js = f.read()
+
     print("Loading offline library vault...")
     libs = {}
     for token, path in LIB_PATHS.items():
@@ -124,6 +129,7 @@ def main():
     html_content = html_content.replace("/* {{prism_css}} */", prism_css)
     html_content = html_content.replace("/* {{codejar_js}} */", codejar_js)
     html_content = html_content.replace("/* {{prism_js}} */", prism_js)
+    html_content = html_content.replace("/* {{patch_engine_js}} */", patch_engine_js)
 
     print("Inlining offline library vault...")
     for token, content in libs.items():
