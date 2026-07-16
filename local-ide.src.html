@@ -4,22 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Local HTML IDE - Portable AI Developer Workspace</title>
-  
+
   <!-- Tailwind CSS v3 Browser Engine (Offline Bundled) -->
   <script>
     /* {{tailwind_js}} */
   </script>
-  
+
   <!-- PrismJS Tomorrow Theme (Offline Bundled) -->
   <style>
     /* {{prism_css}} */
   </style>
-  
+
   <style>
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
-    
+
     /* CodeJar + Prism Custom Styling Overrides */
     .editor-container {
       font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -144,7 +144,7 @@
         <span>Open HTML File</span>
         <input type="file" id="fileUploadInput" accept=".html,.htm" class="hidden">
       </label>
-      
+
       <button id="downloadBtn" class="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-medium px-4 py-2 rounded-lg shadow-lg shadow-blue-500/10 border border-blue-400/20 cursor-pointer transition-all">
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
         <span>Download Completed Tool</span>
@@ -164,7 +164,7 @@
 
   <!-- WORKSPACE BODY: Core Split Screen Interface -->
   <main class="flex-1 flex overflow-hidden">
-    
+
       <!-- LEFT PANEL: Editor and AI Packet Drawer -->
       <section class="w-1/2 flex flex-col bg-[#141417] border-r border-[#222227] h-full overflow-hidden">
 
@@ -194,7 +194,7 @@
           <div id="gutter" class="select-none py-4 text-right pr-3 pl-4 bg-[#111113]/80 text-[#4c4c5e] border-r border-[#222227] overflow-hidden text-xs leading-6 no-scrollbar flex flex-col h-full w-12 shrink-0">
             <div>1</div>
           </div>
-          
+
           <!-- Editing Area -->
           <div id="editor" class="codejar-editor flex-1 p-4 overflow-auto h-full text-xs leading-6 language-html focus:outline-none text-[#e2e8f0]" style="white-space: pre; word-break: keep-all;"></div>
         </div>
@@ -233,7 +233,7 @@
             <!-- Group: Core UI & Reactivity -->
             <div class="space-y-1.5">
               <div class="text-[9px] text-emerald-500/70 font-semibold uppercase tracking-widest pb-1 border-b border-[#222227]">Core UI &amp; Reactivity</div>
-              
+
               <!-- Alpine.js -->
               <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
                 <div class="flex items-center space-x-2.5 min-w-0">
@@ -266,7 +266,7 @@
             <!-- Group: Word & Text Extractors -->
             <div class="space-y-1.5">
               <div class="text-[9px] text-blue-500/70 font-semibold uppercase tracking-widest pb-1 border-b border-[#222227]">Word &amp; Text Extractors</div>
-              
+
               <!-- JSZip -->
               <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
                 <div class="flex items-center space-x-2.5 min-w-0">
@@ -327,7 +327,7 @@
             <!-- Group: Data & Slides -->
             <div class="space-y-1.5">
               <div class="text-[9px] text-amber-500/70 font-semibold uppercase tracking-widest pb-1 border-b border-[#222227]">Data &amp; Slides</div>
-              
+
               <!-- SheetJS -->
               <div class="lib-row flex items-center justify-between p-2 rounded-lg bg-[#141417]/50 border border-[#222227] hover:border-[#2a2a35] transition-all">
                 <div class="flex items-center space-x-2.5 min-w-0">
@@ -385,7 +385,7 @@
             </div>
             <div class="text-left">
               <span class="text-xs font-semibold text-gray-200">Paste AI Update Packet</span>
-              <p class="text-[9px] text-gray-500 font-mono">Apply modifications using strict SEARCH: & REPLACE: structure</p>
+              <p class="text-[9px] text-gray-500 font-mono">Apply structured html-ide-patch v2 packets; legacy SEARCH/REPLACE remains supported</p>
             </div>
           </div>
           <div class="flex items-center space-x-3">
@@ -398,7 +398,7 @@
         <div id="aiDrawerContent" class="px-5 pb-5 space-y-3.5 overflow-hidden transition-all duration-300">
           <div class="relative">
             <textarea id="aiPacketInput" placeholder="SEARCH:&#10;<div class=&quot;old-code&quot;>...</div>&#10;&#10;REPLACE:&#10;<div class=&quot;new-code&quot;>...</div>" class="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"></textarea>
-            
+
             <div class="absolute right-3.5 bottom-3 text-[10px] text-gray-600 font-mono select-none">
               Supports multiple blocks
             </div>
@@ -408,11 +408,14 @@
             <div class="text-[10px] text-gray-500">
               <a href="#" id="loadExamplePacket" class="text-purple-400 hover:underline">Load Example Packet</a>
             </div>
-            
+
+            <div class="flex items-center space-x-2">
+            <button id="undoPatchBtn" class="flex items-center space-x-2 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-gray-300 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-all" title="Undo the last applied AI patch transaction">Undo Patch</button>
             <button id="applyChangesBtn" class="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white text-xs font-semibold px-4.5 py-2 rounded-lg cursor-pointer transition-all border border-purple-400/20 shadow-lg shadow-purple-500/10">
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>
               <span>Apply Changes</span>
             </button>
+            </div>
           </div>
         </div>
       </div>
@@ -421,7 +424,7 @@
 
     <!-- RIGHT PANEL: Full Height Live Preview Renderer -->
     <section class="w-1/2 flex flex-col bg-[#0f0f11] h-full overflow-hidden">
-      
+
       <!-- Frame Controls Bar -->
       <div class="h-12 bg-[#121214] border-b border-[#222227] px-6 flex items-center justify-between">
         <div class="flex items-center space-x-2.5">
@@ -557,7 +560,7 @@ tags: [skill, html-tool, code-editor]
 # local-html-ide
 
 ## Purpose
-Use this skill when you want to modify, add, or delete code inside the active HTML editor workspace of the Local HTML IDE. 
+Use this skill when you want to modify, add, or delete code inside the active HTML editor workspace of the Local HTML IDE.
 
 ## Available Offline Libraries
 The IDE contains preloaded offline library assets. You can inject them instantly into your HTML code by simply writing their corresponding **Stem Tags** anywhere inside the editor code:
@@ -573,31 +576,33 @@ The IDE contains preloaded offline library assets. You can inject them instantly
 
 *IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag. The compilation packer will automatically inline the full library code on preview or download.
 
+## Create Mode
+For a brand-new app, return exactly one complete HTML document and no Markdown fences or commentary. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
+
 ## How the Agent Edits Code
-To edit code in the IDE, you must generate one or more code modification blocks using a strict `SEARCH:` and `REPLACE:` format. The user will copy-paste this block into the AI Update Drawer to apply the changes.
+For edits to an existing app, generate a structured JSON `html-ide-patch` version `2.0` packet by default. The user will paste it into the AI Update Drawer. Include the exact current source hash supplied by the IDE/user as `target.sourceHash`, unique patch ids, explicit `expectedMatches`, and exact search text. Supported operations are `replace`, `insert_before`, `insert_after`, `delete`, and `replace_region` using `<!-- HTML_IDE_REGION:name:start -->` / `<!-- HTML_IDE_REGION:name:end -->` markers.
 
-### AI Update Packet Format
-Write your modification block exactly like this:
-
-SEARCH:
-[Paste the exact code block currently in the editor that you want to change]
-REPLACE:
-[Paste the new replacement code block]
+### Structured AI Update Packet Format
+{
+  "protocol": "html-ide-patch",
+  "version": "2.0",
+  "target": { "sourceHash": "sha256:..." },
+  "patches": [
+    {
+      "id": "change-button-label",
+      "operation": "replace",
+      "matching": { "strategy": "exact", "expectedMatches": 1, "search": "<button>Save</button>" },
+      "replacement": "<button>Export</button>"
+    }
+  ]
+}
 
 ### Rules for Generating Packets:
-1. **Exact Matches**: The code under `SEARCH:` must match the code in the editor exactly, including whitespace, comments, and empty lines.
-2. **Context**: Include 2-3 lines of surrounding code under `SEARCH:` to help the parser locate unique sections.
-3. **Multiple Replacements**: You can stack multiple blocks in a single response to apply multiple modifications:
-   
-   SEARCH:
-   [first search block]
-   REPLACE:
-   [first replace block]
-   
-   SEARCH:
-   [second search block]
-   REPLACE:
-   [second replace block]
+1. **Exact Matches**: The `matching.search` text must match exactly unless a controlled strategy is explicitly requested.
+2. **No Ambiguity**: If a search block appears more than once, add stable surrounding context or use a named region; do not rely on first occurrence.
+3. **Atomicity**: All patches must be valid together. One bad patch rejects the whole packet.
+4. **Library Safety**: Insert Stem Tags for libraries; never paste full bundled library payloads.
+5. **Legacy**: SEARCH:/REPLACE: blocks are accepted only for compatibility and lack hash protection.
 
 ## How to open the tool
 A local HTML tool cannot be opened from a chat hyperlink. Give the operator this block verbatim, then one instruction line, and nothing else:
@@ -635,7 +640,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Minimalist Pomodoro Clock</title>
-  
+
   <!-- Modern Tailwind styles will render in our live pane -->
   <script src="https://cdn.tailwindcss.com"><\/script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
@@ -643,7 +648,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
 <body class="bg-slate-950 text-white min-h-screen flex flex-col justify-center items-center font-sans">
 
   <div class="w-full max-w-md mx-auto p-8 rounded-3xl bg-slate-900/60 border border-slate-800/80 shadow-2xl backdrop-blur-md text-center">
-    
+
     <!-- Title and details -->
     <h1 class="text-2xl font-bold tracking-tight text-white mb-2">Focus Session</h1>
     <p class="text-xs text-slate-400 font-medium mb-12 uppercase tracking-widest">Time to align and create</p>
@@ -652,7 +657,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
       <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
       <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45"></div>
-      
+
       <!-- Time counter -->
       <div class="z-10">
         <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
@@ -665,11 +670,11 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       <button id="resetTimer" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all cursor-pointer">
         <i class="fa-solid fa-rotate-left text-sm"></i>
       </button>
-      
+
       <button id="playPauseTimer" class="h-16 w-16 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition-all cursor-pointer shadow-lg shadow-blue-500/20 scale-100 hover:scale-105 active:scale-95">
         <i id="playIcon" class="fa-solid fa-play text-lg translate-x-0.5"></i>
       </button>
-      
+
       <button id="toggleSession" class="h-12 w-12 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-all cursor-pointer">
         <i class="fa-solid fa-circle-half-stroke text-sm"></i>
       </button>
@@ -696,7 +701,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       const minutes = Math.floor(timeRemaining / 60);
       const seconds = timeRemaining % 60;
       timerDisplay.textContent = \`\${minutes.toString().padStart(2, '0')}:\${seconds.toString().padStart(2, '0')}\`;
-      
+
       // Rotate radial fill slightly to simulate ticking down
       const total = isWorkSession ? 25 * 60 : 5 * 60;
       const progress = (total - timeRemaining) / total;
@@ -772,6 +777,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       refreshIframeBtn: document.getElementById('refreshIframeBtn'),
       aiPacketInput: document.getElementById('aiPacketInput'),
       applyChangesBtn: document.getElementById('applyChangesBtn'),
+      undoPatchBtn: document.getElementById('undoPatchBtn'),
       loadExamplePacket: document.getElementById('loadExamplePacket'),
       toggleAiDrawerBtn: document.getElementById('toggleAiDrawerBtn'),
       aiDrawer: document.getElementById('aiDrawer'),
@@ -836,7 +842,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function syncLineNumbers() {
       const lineCount = state.code.split('\n').length;
       elements.editorLineCount.textContent = `${lineCount} line${lineCount === 1 ? '' : 's'}`;
-      
+
       let gutterHTML = '';
       for (let i = 1; i <= Math.max(1, lineCount); i++) {
         gutterHTML += `<div>${i}</div>`;
@@ -1003,7 +1009,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     // Unpack Inlined Libraries from code to stems
     function unpackInlinedLibraries(html) {
       let cleanedHtml = html;
-      
+
       // Strip injected PDF.js worker and setup script blocks to keep editor clean
       cleanedHtml = cleanedHtml.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>([\s\S]*?)<\/script>/gi, '');
       cleanedHtml = cleanedHtml.replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>([\s\S]*?)<\/script>/gi, '');
@@ -1012,7 +1018,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       cleanedHtml = cleanedHtml.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi, (match, libId) => {
         return `<script id="${libId}-stem"><\/script>`;
       });
-      
+
       // Replace injected library stylesheet blocks with their stems
       cleanedHtml = cleanedHtml.replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi, (match, libId) => {
         return `<link rel="stylesheet" id="${libId}-stem">`;
@@ -1031,12 +1037,12 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     // Pack Libraries: replaces stems with full inlined library content
     function packLibraries(html) {
       let packedHtml = html;
-      
+
       const libIds = [
-        'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater', 
+        'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater',
         'lib-docx', 'lib-mammoth', 'lib-sheetjs', 'lib-pptxgen', 'lib-pdfjs'
       ];
-      
+
       libIds.forEach(libId => {
         const container = document.getElementById(libId);
         if (container) {
@@ -1048,7 +1054,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
             const stemRegex = new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`, 'gi');
             const workerContainer = document.getElementById('lib-pdfjs-worker');
             const workerContent = workerContainer ? workerContainer.textContent : '';
-            
+
             packedHtml = packedHtml.replace(stemRegex, () => {
               return `<script id="injected-${libId}">\n${content}\n<\/script>\n` +
                      `<script id="injected-${libId}-worker" type="text/plain">\n${workerContent}\n<\/script>\n` +
@@ -1066,7 +1072,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
           }
         }
       });
-      
+
       return packedHtml;
     }
 
@@ -1074,16 +1080,16 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function syncLibraryIndicators() {
       const code = state.code;
       const libIds = [
-        'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater', 
+        'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater',
         'lib-docx', 'lib-mammoth', 'lib-sheetjs', 'lib-pptxgen', 'lib-pdfjs'
       ];
-      
+
       let activeCount = 0;
       libIds.forEach(libId => {
         const hasStem = code.includes(`id="${libId}-stem"`);
         const dot = document.getElementById(`dot-${libId.replace('lib-', '')}`);
         const row = dot ? dot.closest('.lib-row') : null;
-        
+
         if (dot) {
           if (hasStem) {
             dot.className = "lib-status-dot h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 shadow-lg shadow-emerald-500/50";
@@ -1101,7 +1107,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
           }
         }
       });
-      
+
       if (activeCount > 0) {
         elements.libPackerCount.textContent = `${activeCount} active`;
         elements.libPackerCount.classList.remove('hidden');
@@ -1112,10 +1118,10 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
 
     // Copy Stem Tag Helper Exposed on Window
     window.copyStemTag = function(buttonEl, libId) {
-      const stem = libId === 'lib-picocss' 
+      const stem = libId === 'lib-picocss'
         ? `<link rel="stylesheet" id="${libId}-stem">`
         : `<script id="${libId}-stem"><\/script>`;
-        
+
       copyText(stem).then(() => {
         const origText = buttonEl.textContent;
         buttonEl.textContent = 'Copied!';
@@ -1417,7 +1423,7 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
 
       const blob = new Blob([finalCode], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
@@ -1427,154 +1433,196 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
       URL.revokeObjectURL(url);
     });
 
-    // AI Packet parser for SEARCH & REPLACE blocks
-    elements.applyChangesBtn.addEventListener('click', applyPacketUpdates);
-    
-    // Ctrl + Enter inside textarea trigger
-    elements.aiPacketInput.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.key === 'Enter') {
-        e.preventDefault();
-        applyPacketUpdates();
-      }
-    });
+    // Hardened AI patch engine. Structured v2 packets are all-or-nothing and
+    // legacy SEARCH/REPLACE packets are kept as a compatibility path.
+    const PATCH_HISTORY_LIMIT = 20;
+    const patchHistory = [];
 
-    function applyPacketUpdates() {
-      const packet = elements.aiPacketInput.value;
-      if (!packet.trim()) {
-        alert('Please paste a non-empty AI Update Packet first containing SEARCH: and REPLACE: blocks.');
-        return;
-      }
-
-      try {
-        const lines = packet.replace(/\r\n/g, '\n').split('\n');
-        let blocks = [];
-        let currentBlock = null;
-        let stateMode = 'IDLE'; // IDLE, SEARCH, REPLACE
-        
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const trimmed = line.trim();
-          
-          if (trimmed === 'SEARCH:') {
-            if (currentBlock && stateMode === 'REPLACE') {
-              blocks.push(currentBlock);
-            }
-            currentBlock = { search: '', replace: '' };
-            stateMode = 'SEARCH';
-            continue;
-          } else if (trimmed === 'REPLACE:') {
-            if (stateMode === 'SEARCH' && currentBlock) {
-              stateMode = 'REPLACE';
-              continue;
-            }
-          }
-          
-          if (stateMode === 'SEARCH' && currentBlock) {
-            currentBlock.search += line + '\n';
-          } else if (stateMode === 'REPLACE' && currentBlock) {
-            currentBlock.replace += line + '\n';
-          }
-        }
-        
-        if (currentBlock && stateMode === 'REPLACE') {
-          blocks.push(currentBlock);
-        }
-        
-        // Trim final newlines added by parser loops
-        blocks = blocks.map(b => ({
-          search: b.search.slice(0, -1),
-          replace: b.replace.slice(0, -1)
-        }));
-        
-        if (blocks.length === 0) {
-          throw new Error('No valid SEARCH: and REPLACE: tags found. Check syntax:\n\nSEARCH:\n[code to find]\nREPLACE:\n[code to replace]');
-        }
-        
-        let activeWorkspaceText = state.code;
-        let successCount = 0;
-        let failedBlocks = [];
-        
-        for (let idx = 0; idx < blocks.length; idx++) {
-          const block = blocks[idx];
-          
-          // Match 1: Try direct exact index lookup
-          const exactIdx = activeWorkspaceText.indexOf(block.search);
-          if (exactIdx !== -1) {
-            activeWorkspaceText = activeWorkspaceText.replace(block.search, block.replace);
-            successCount++;
-          } else {
-            // Match 2: Flexible trim-matching logic for space/whitespace deviations
-            const docLines = activeWorkspaceText.split('\n');
-            const searchLines = block.search.split('\n').map(l => l.trim()).filter(l => l !== '');
-            
-            let matchedIndex = -1;
-            
-            for (let dIdx = 0; dIdx <= docLines.length - searchLines.length; dIdx++) {
-              let matches = true;
-              for (let sIdx = 0; sIdx < searchLines.length; sIdx++) {
-                if (docLines[dIdx + sIdx].trim() !== searchLines[sIdx]) {
-                  matches = false;
-                  break;
-                }
-              }
-              if (matches) {
-                matchedIndex = dIdx;
-                break;
-              }
-            }
-            
-            if (matchedIndex !== -1 && searchLines.length > 0) {
-              // Indent tracking to preserve coding architecture
-              const leadingSpacing = docLines[matchedIndex].match(/^\s*/)[0];
-              const formattedReplacement = block.replace.split('\n').map((line, lIdx) => {
-                if (lIdx === 0) return line;
-                return leadingSpacing + line;
-              }).join('\n');
-              
-              docLines.splice(matchedIndex, searchLines.length, formattedReplacement);
-              activeWorkspaceText = docLines.join('\n');
-              successCount++;
-            } else {
-              failedBlocks.push({
-                num: idx + 1,
-                snippet: block.search.substring(0, 100) + (block.search.length > 100 ? '...' : '')
-              });
-            }
-          }
-        }
-        
-        // Report outcomes back to user
-        if (successCount > 0) {
-          state.code = activeWorkspaceText;
-          jar.updateCode(activeWorkspaceText);
-          syncLineNumbers();
-          triggerLivePreview();
-          
-          if (failedBlocks.length > 0) {
-            alert(`Applied ${successCount} modifications successfully!\n\nFailed to apply ${failedBlocks.length} updates:\n` + failedBlocks.map(f => `Block ${f.num}: "${f.snippet}"`).join('\n'));
-          } else {
-            // Highlight changes applied successfully
-            const animElement = elements.applyChangesBtn;
-            animElement.classList.add('bg-green-600', 'from-green-600', 'to-emerald-500');
-            const origSpan = animElement.querySelector('span').textContent;
-            animElement.querySelector('span').textContent = 'Applied!';
-            
-            setTimeout(() => {
-              animElement.classList.remove('bg-green-600', 'from-green-600', 'to-emerald-500');
-              animElement.querySelector('span').textContent = origSpan;
-            }, 1500);
-            
-            // Clear textarea inputs on pure successes
-            elements.aiPacketInput.value = '';
-          }
-        } else {
-          alert('Failed to apply updates. Could not find match for specified search strings inside the current editor code. Check for spaces or line breaks.');
-        }
-        
-      } catch (err) {
-        alert(err.message);
-      }
+    function normalizeNewlines(text) { return String(text || '').replace(/\r\n?/g, '\n'); }
+    async function sha256Hex(text) {
+      const bytes = new TextEncoder().encode(text);
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
     }
+    function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
+
+    function parseLegacySearchReplace(packet) {
+      const lines = normalizeNewlines(packet).split('\n');
+      let blocks = [], currentBlock = null, stateMode = 'IDLE';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed === 'SEARCH:') {
+          if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
+          currentBlock = { search: '', replace: '' };
+          stateMode = 'SEARCH';
+          continue;
+        }
+        if (trimmed === 'REPLACE:' && stateMode === 'SEARCH' && currentBlock) { stateMode = 'REPLACE'; continue; }
+        if (stateMode === 'SEARCH' && currentBlock) currentBlock.search += line + '\n';
+        if (stateMode === 'REPLACE' && currentBlock) currentBlock.replace += line + '\n';
+      }
+      if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
+      blocks = blocks.map((b, i) => ({ id: 'legacy-' + (i + 1), operation: 'replace', matching: { strategy: 'exact', expectedMatches: 1, search: b.search.slice(0, -1) }, replacement: b.replace.slice(0, -1) }));
+      if (!blocks.length) throw new Error('No valid structured JSON packet or legacy SEARCH:/REPLACE: blocks were found.');
+      return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
+    }
+
+    function parsePatchPacket(packet) {
+      const trimmed = packet.trim();
+      if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packet);
+      let parsed;
+      try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
+      if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
+      if (parsed.version !== '2.0') throw new Error('Unsupported html-ide-patch version: ' + (parsed.version || '(missing)'));
+      if (!parsed.target || typeof parsed.target.sourceHash !== 'string') throw new Error('Structured patches require target.sourceHash.');
+      if (!Array.isArray(parsed.patches) || parsed.patches.length === 0) throw new Error('Structured patches require a non-empty patches array.');
+      const ids = new Set();
+      parsed.patches.forEach((patch, idx) => {
+        if (!patch || typeof patch !== 'object') throw new Error('Patch #' + (idx + 1) + ' must be an object.');
+        if (!patch.id || typeof patch.id !== 'string') throw new Error('Patch #' + (idx + 1) + ' requires a string id.');
+        if (ids.has(patch.id)) throw new Error('Duplicate patch id: ' + patch.id);
+        ids.add(patch.id);
+        if (!['replace', 'insert_before', 'insert_after', 'delete', 'replace_region'].includes(patch.operation)) throw new Error('Patch ' + patch.id + ' has unsupported operation: ' + patch.operation);
+        if (!patch.matching || typeof patch.matching !== 'object') throw new Error('Patch ' + patch.id + ' requires matching.');
+        if (!['exact', 'trim_trailing_whitespace', 'indentation'].includes(patch.matching.strategy || 'exact')) throw new Error('Patch ' + patch.id + ' has unsupported matching strategy.');
+        if (!Number.isInteger(patch.matching.expectedMatches) || patch.matching.expectedMatches < 1) throw new Error('Patch ' + patch.id + ' requires expectedMatches >= 1.');
+        if (patch.operation === 'replace_region') {
+          if (!patch.matching.region || typeof patch.matching.region !== 'string') throw new Error('Patch ' + patch.id + ' replace_region requires matching.region.');
+        } else if (typeof patch.matching.search !== 'string' || patch.matching.search.length === 0) {
+          throw new Error('Patch ' + patch.id + ' requires a non-empty matching.search string.');
+        }
+      });
+      return parsed;
+    }
+
+    function findExactMatches(source, search) {
+      const matches = [];
+      let idx = source.indexOf(search);
+      while (idx !== -1) { matches.push({ start: idx, end: idx + search.length }); idx = source.indexOf(search, idx + Math.max(1, search.length)); }
+      return matches;
+    }
+
+    function resolvePatch(source, patch) {
+      if (patch.operation === 'replace_region') {
+        const name = patch.matching.region;
+        const startMarker = '<!-- HTML_IDE_REGION:' + name + ':start -->';
+        const endMarker = '<!-- HTML_IDE_REGION:' + name + ':end -->';
+        const start = source.indexOf(startMarker), end = source.indexOf(endMarker);
+        if (start === -1 || end === -1 || end < start) return { ok: false, error: 'Region markers not found for ' + name, matches: [] };
+        return { ok: true, matches: [{ start: start + startMarker.length, end }] };
+      }
+      const search = patch.matching.search;
+      const matches = findExactMatches(source, search);
+      if (matches.length !== patch.matching.expectedMatches) return { ok: false, error: 'Expected ' + patch.matching.expectedMatches + ' match(es), found ' + matches.length, matches };
+      return { ok: true, matches };
+    }
+
+    function applyResolved(source, resolvedItems) {
+      let output = source;
+      const ordered = [];
+      resolvedItems.forEach(item => item.resolution.matches.forEach(match => ordered.push({ patch: item.patch, match })));
+      ordered.sort((a, b) => b.match.start - a.match.start);
+      for (const item of ordered) {
+        const patch = item.patch, match = item.match;
+        const replacement = patch.operation === 'delete' ? '' : (patch.replacement || '');
+        if (patch.operation === 'insert_before') output = output.slice(0, match.start) + replacement + output.slice(match.start);
+        else if (patch.operation === 'insert_after') output = output.slice(0, match.end) + replacement + output.slice(match.end);
+        else output = output.slice(0, match.start) + replacement + output.slice(match.end);
+      }
+      return output;
+    }
+
+    async function preflightPatchPacket(packetText, source) {
+      const packet = parsePatchPacket(packetText);
+      const currentHash = 'sha256:' + await sha256Hex(source);
+      if (!packet.legacy && packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
+      const resolvedItems = [];
+      for (const patch of packet.patches) {
+        const resolution = resolvePatch(source, patch);
+        if (!resolution.ok) throw new Error('Patch ' + patch.id + ' failed preflight: ' + resolution.error);
+        resolvedItems.push({ patch, resolution });
+      }
+      const output = applyResolved(source, resolvedItems);
+      const nextHash = 'sha256:' + await sha256Hex(output);
+      return { packet, currentHash, nextHash, output, resolvedItems };
+    }
+
+    function summarizePreflight(report) {
+      const lines = [(report.packet.legacy ? 'Legacy SEARCH/REPLACE compatibility packet' : 'Structured html-ide-patch v2 packet'), 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
+      report.resolvedItems.forEach(item => {
+        const ranges = item.resolution.matches.map(m => 'line ' + lineFromIndex(state.code, m.start) + ', chars ' + m.start + '-' + m.end).join('; ');
+        lines.push('- ' + item.patch.id + ' [' + item.patch.operation + '] ' + ranges);
+      });
+      if (report.packet.legacy) lines.push('Warning: legacy packets do not include source hashes and are less safe than v2 JSON packets.');
+      return lines.join('\n');
+    }
+
+    elements.applyChangesBtn.addEventListener('click', applyPacketUpdates);
+    elements.undoPatchBtn.addEventListener('click', undoLastPatchTransaction);
+    elements.aiPacketInput.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); applyPacketUpdates(); } });
+
+    async function applyPacketUpdates() {
+      const packet = elements.aiPacketInput.value;
+      if (!packet.trim()) { alert('Please paste a non-empty AI Update Packet first.'); return; }
+      try {
+        const before = state.code;
+        const report = await preflightPatchPacket(packet, before);
+        if (!confirm('Patch preflight passed. Apply atomically?\n\n' + summarizePreflight(report))) return;
+        state.code = report.output;
+        patchHistory.push({ before, after: report.output, packet: report.packet, sourceHash: report.currentHash, resultHash: report.nextHash, timestamp: new Date().toISOString(), patchIds: report.packet.patches.map(p => p.id) });
+        while (patchHistory.length > PATCH_HISTORY_LIMIT) patchHistory.shift();
+        jar.updateCode(report.output); syncLineNumbers(); triggerLivePreview(); syncLibraryIndicators();
+        elements.aiPacketInput.value = '';
+        alert('Applied ' + report.packet.patches.length + ' patch(es) as one transaction.');
+      } catch (err) { alert(err.message); }
+    }
+
+    function undoLastPatchTransaction() {
+      const tx = patchHistory.pop();
+      if (!tx) { alert('No patch transaction is available to undo in this session.'); return; }
+      state.code = tx.before;
+      jar.updateCode(tx.before); syncLineNumbers(); triggerLivePreview(); syncLibraryIndicators();
+      alert('Undid patch transaction: ' + tx.patchIds.join(', '));
+    }
+
+    // Initialize Collapsible state for libraries
+    elements.libPackerContent.style.maxHeight = '0px';
+
+    elements.downloadBtn.addEventListener('click', () => {
+      // Pack the editor's code directly based on the stems present
+      let finalCode = packLibraries(state.code);
+
+      const fileName = state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
+
+      // StickShift compliance is opt-in via the header checkbox
+      if (elements.ssEmbedCheckbox && elements.ssEmbedCheckbox.checked) {
+        finalCode = injectStickShiftCompliance(finalCode, fileName);
+      }
+
+      // Guard against closing-script sequences hiding inside JS strings —
+      // these silently corrupt the exported file when a browser parses it
+      const breakouts = detectScriptBreakouts(finalCode);
+      if (breakouts.length > 0) {
+        const detail = breakouts.map(b => 'Line ~' + b.line + ': ...' + b.snippet).join('\n');
+        const proceed = confirm(
+          'Warning: the compiled output likely contains a closing script tag inside a JS string or template literal.\n\n' +
+          'Browsers terminate a script block at the first one they see — even mid-string — so the downloaded tool will break there and render its remaining code as page text.\n\n' +
+          'Fix: escape it in your code as <\\/script>.\n\n' + detail + '\n\nDownload anyway?'
+        );
+        if (!proceed) { return; }
+      }
+
+      const blob = new Blob([finalCode], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
 
     // Load sample packet helper link
     elements.loadExamplePacket.addEventListener('click', (e) => {
@@ -1584,7 +1632,7 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
     <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
       <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
       <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45"></div>
-      
+
       <!-- Time counter -->
       <div class="z-10">
         <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
@@ -1596,7 +1644,7 @@ REPLACE:
     <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
       <div class="absolute inset-0 rounded-full border-4 border-purple-500/30 shadow-lg shadow-purple-500/20"></div>
       <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 border-r-purple-500 transition-all duration-1000 rotate-45"></div>
-      
+
       <!-- Time counter -->
       <div class="z-10">
         <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]">25:00</span>
@@ -1613,7 +1661,7 @@ REPLACE:
     elements.ssOpen.addEventListener('click', () => {
       elements.ssPanel.classList.add('active');
     });
-    
+
     elements.ssClose.addEventListener('click', () => {
       elements.ssPanel.classList.remove('active');
     });
@@ -1691,11 +1739,11 @@ REPLACE:
         const copyIcon = document.getElementById('ss-copy-icon');
         const checkIcon = document.getElementById('ss-check-icon');
         const copyTextSpan = document.getElementById('ss-copy-text');
-        
+
         copyIcon.classList.add('hidden');
         checkIcon.classList.remove('hidden');
         copyTextSpan.textContent = 'Copied!';
-        
+
         setTimeout(() => {
           copyIcon.classList.remove('hidden');
           checkIcon.classList.add('hidden');
