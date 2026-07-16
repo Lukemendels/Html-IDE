@@ -135,6 +135,18 @@ def main():
         if item.get("required") and not os.path.isfile(asset_path):
             raise FileNotFoundError(f"Required offline library {item['displayName']} is missing: {asset_path}. Run npm install.")
         if os.path.isfile(asset_path):
+            asset_size = os.path.getsize(asset_path)
+            minimum_bytes = item.get("minimumBytes", 1)
+            if asset_size < minimum_bytes:
+                raise RuntimeError(f"Offline library {item['displayName']} is only {asset_size} bytes; expected at least {minimum_bytes}. Refusing a compatibility shim or truncated distribution.")
+            package_json = os.path.join(WORKSPACE_DIR, "node_modules", item["package"], "package.json")
+            if item.get("version"):
+                if not os.path.isfile(package_json):
+                    raise FileNotFoundError(f"Official package metadata missing for {item['displayName']}: {package_json}")
+                with open(package_json, "r", encoding="utf-8") as package_file:
+                    installed_version = json.load(package_file).get("version")
+                if installed_version != item["version"]:
+                    raise RuntimeError(f"Offline library {item['displayName']} requires {item['version']}, found {installed_version}.")
             catalog_libs[item["vaultId"]] = load_lib(item["id"], asset_path)
         if item.get("workerAsset"):
             worker_path = os.path.join(WORKSPACE_DIR, item["workerAsset"])
