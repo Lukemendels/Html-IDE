@@ -2,6 +2,7 @@
 import os
 import re
 import urllib.request
+import json
 
 WORKSPACE_DIR = os.environ.get(
     "HTMLIDE_WORKSPACE",
@@ -15,6 +16,7 @@ TAILWIND_CACHE_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "tailwind-cdn-
 PRISM_CSS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "themes", "prism-tomorrow.min.css")
 PRISM_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "prism.js")
 CODEJAR_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "codejar", "dist", "codejar.js")
+REGISTRY_PATH = os.path.join(WORKSPACE_DIR, "config", "offline-libraries.json")
 PATCH_ENGINE_JS_PATH = os.path.join(WORKSPACE_DIR, "scripts", "patch-engine.cjs")
 
 # Offline library vault paths — resolved from locally installed npm packages
@@ -123,6 +125,18 @@ def main():
     with open(PATCH_ENGINE_JS_PATH, "r", encoding="utf-8") as f:
         patch_engine_js = f.read()
 
+    with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
+        registry = json.load(f)
+    catalog_libs = {}
+    for item in registry:
+        asset_path = os.path.join(WORKSPACE_DIR, item["browserBundlePath"])
+        if item.get("required") and not os.path.isfile(asset_path):
+            raise FileNotFoundError(f"Required offline library {item['displayName']} is missing: {asset_path}. Run npm install.")
+        if os.path.isfile(asset_path):
+            catalog_libs[item["vaultId"]] = load_lib(item["id"], asset_path)
+        if item.get("workerAsset"):
+            worker_path = os.path.join(WORKSPACE_DIR, item["workerAsset"])
+            if not os.path.isfile(worker_path): raise FileNotFoundError(f"Required worker is missing: {worker_path}")
     print("Loading offline library vault...")
     libs = {}
     for token, path in LIB_PATHS.items():
@@ -131,6 +145,19 @@ def main():
     print(f"Reading template: {TEMPLATE_PATH}")
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html_content = f.read()
+
+    browser_registry = [{k: v for k, v in item.items() if k not in ("browserBundlePath", "workerAsset", "package")} for item in registry]
+    html_content = html_content.replace("/* {{offline_library_registry}} */", escape_script_data_block(json.dumps(browser_registry, ensure_ascii=False, separators=(",", ":"))))
+    legacy_vaults = set(LIB_PATHS)
+    vault_html = []
+    for item in registry:
+        token = "lib_" + item["id"]
+        if token in legacy_vaults: continue
+        content = catalog_libs[item["vaultId"]]
+        escaped = escape_style_data_block(content) if item["assetType"] == "style" else escape_script_data_block(content)
+        tag = "style" if item["assetType"] == "style" else "script"
+        vault_html.append(f'<{tag} type="text/plain" id="{item["vaultId"]}">{escaped}</{tag}>')
+    html_content = html_content.replace("<!-- {{generated_library_vault}} -->", "\n  ".join(vault_html))
 
     print("Inlining core dependencies...")
     html_content = html_content.replace("/* {{tailwind_js}} */", tailwind_js)

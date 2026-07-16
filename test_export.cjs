@@ -49,19 +49,18 @@ check('payload injected after the fake in-string </body>', firstBodyIdxLower < l
 
 // Double-injection guard
 const reInjected = api.injectStickShiftCompliance(injected, 'demo.html');
-check('double-injection guard', reInjected === injected);
+check('double-injection guard', (reInjected.match(/STICKSHIFT_SKILL_START/g) || []).length === 1);
 
 // Skill markdown template substitution
-const md = api.renderSkillMarkdown('demo.html', 'demo-skill', 'Demo Tool');
+const DEFAULT_TEMPLATE = '{{TOOL_FILE}} {{SKILL_SLUG}} {{TOOL_TITLE}}';
+const md = api.renderSkillMarkdown(DEFAULT_TEMPLATE, 'demo.html', 'demo-skill', 'Demo Tool');
 check('renderSkillMarkdown substitutes tool file', md.includes('demo.html'));
 check('renderSkillMarkdown substitutes skill slug', md.includes('demo-skill'));
 check('renderSkillMarkdown substitutes tool title', md.includes('Demo Tool'));
 
-// A custom template containing a raw closing script tag must come out escaped
-global.localStorage.setItem(api.SS_KEYS.skillTemplate, 'Custom body with ' + CLOSE + ' inside for {{TOOL_TITLE}}.');
-const mdCustom = api.renderSkillMarkdown('demo.html', 'demo-skill', 'Demo Tool');
-check('renderSkillMarkdown escapes raw closing script tag', !mdCustom.includes(CLOSE) && mdCustom.includes('<\\/script'));
-global.localStorage.removeItem(api.SS_KEYS.skillTemplate);
+// Explicit custom template is used without consulting localStorage.
+const mdCustom = api.renderSkillMarkdown('Custom body for {{TOOL_TITLE}}.', 'demo.html', 'demo-skill', 'Demo Tool');
+check('renderSkillMarkdown uses explicit template', mdCustom === 'Custom body for Demo Tool.');
 
 // detectScriptBreakouts should flag a closing script sequence hidden inside
 // a JS string/template literal in an executing script block.

@@ -75,3 +75,21 @@ node_modules library file
 ```
 
 Preview and download now share `compileAppSource()`. Preview calls it without StickShift injection, while download calls it with the current StickShift checkbox state; library resolution and script escaping are otherwise shared. Export validation currently checks unresolved stems, duplicate injected-library IDs, and missing PDF.js worker payloads. Browser-based validation is still desirable as a release gate, but this execution environment did not provide Chromium or Playwright.
+
+## Current Tool Skill and reusable default
+
+The **Current Tool Skill** textarea is the authoritative in-memory template passed explicitly to `compileAppSource`. Editing it marks the current tool modified; **Set as Reusable Default** is the only action that writes the reusable browser default. **Reset Current Skill to Default** restores that explicit default (or the built-in template). When **Embed StickShift** is off, compilation adds no generated compliance blocks.
+
+`{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are rendered from the output filename without modifying the template. **Copy Rendered Skill** and export use the same renderer. Export escapes case-insensitive closing-script text only at the HTML data-block boundary.
+
+When opening a generated tool, the IDE extracts the marked `STICKSHIFT_SKILL` block before removing generated compliance and unpacking libraries. A later export canonicalizes all five marked blocks and embeds the edited skill once. An unmarked `stickshift-skill` is treated as a conflict and export stops rather than overwriting third-party content.
+
+## Canonical offline catalog
+
+`config/offline-libraries.json` is the machine-readable catalog for build assets, browser vault IDs, stems, injected IDs, descriptions, globals, and PDF.js worker handling. The supported stems are Alpine.js, Pico.css, JSZip, docxtemplater, docx, Mammoth.js, SheetJS, PptxGenJS, PDF.js, Chart.js, Day.js, Marked, DOMPurify, Papa Parse, SortableJS, and Fuse.js. The builder fails if a required asset is missing; run `npm install` first.
+
+Offline payloads increase the standalone artifact by their minified browser-bundle sizes. Use stems rather than pasting full minified payloads, because pasted payloads defeat unpacking, reviewability, and size control. Catalog libraries never use a CDN at runtime.
+
+## Non-blocking status
+
+Routine completion uses the shared dark-theme `#app-status` region (`aria-live="polite"`) and automatically clears. Copy controls may also change their label briefly. Patch apply/undo, skill changes, file open, and download do not use success dialogs. Confirmations remain for workspace reset, patch preflight, unsafe undo restore, and integrity-warning download. Actionable failures may still use blocking error dialogs so details remain prominent.
