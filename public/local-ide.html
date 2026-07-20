@@ -3724,7 +3724,11 @@ Prism.languages.js = Prism.languages.javascript;
     // Refresh Live Iframe Frame
     elements.refreshIframeBtn.addEventListener('click', () => {
       elements.refreshIcon.classList.add('animate-spin');
-      elements.previewFrame.srcdoc = state.code;
+      try {
+        elements.previewFrame.srcdoc = compileAppSource(state.code, { embedStickShift: false }).html;
+      } catch (err) {
+        elements.previewFrame.srcdoc = `<pre style="white-space:pre-wrap;color:#fca5a5;background:#111827;padding:1rem;font-family:monospace">${String(err.message || err).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>`;
+      }
       setTimeout(() => {
         elements.refreshIcon.classList.remove('animate-spin');
       }, 600);
@@ -3892,7 +3896,16 @@ Prism.languages.js = Prism.languages.javascript;
       }
       const unresolvedStem = html.match(/<(?:script|link)\b[^>]*id=["']lib-[^"']+-stem["'][^>]*>/i);
       if (unresolvedStem) return { ok: false, errors: ['Unresolved library stem remains: ' + unresolvedStem[0].slice(0, 120)] };
-      if (/<script\b[^>]*id=["']injected-lib-pdfjs["'][^>]*>/i.test(html) && !/<script\b[^>]*id=["']injected-lib-pdfjs-worker["'][^>]*type=["']text\/plain["'][^>]*>/i.test(html)) return { ok: false, errors: ['PDF.js was injected without its inlined worker payload.'] };
+      const pdfMain = [...html.matchAll(/<script\b[^>]*id=["']injected-lib-pdfjs["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      const pdfWorker = [...html.matchAll(/<script\b[^>]*id=["']injected-lib-pdfjs-worker["'][^>]*type=["']text\/plain["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      const pdfSetup = [...html.matchAll(/<script\b[^>]*id=["']injected-lib-pdfjs-setup["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      if (pdfMain.length || pdfWorker.length || pdfSetup.length) {
+        if (pdfMain.length !== 1 || pdfWorker.length !== 1 || pdfSetup.length !== 1 || !pdfMain[0][1].trim() || !pdfWorker[0][1].trim()) return { ok: false, errors: ['PDF.js must include exactly one main library, non-executing worker payload, and setup script.'] };
+        if (!(pdfMain[0].index < pdfWorker[0].index && pdfWorker[0].index < pdfSetup[0].index)) return { ok: false, errors: ['PDF.js main library, worker payload, and setup script are out of order.'] };
+        const setup = pdfSetup[0][1];
+        if (!setup.includes("getElementById('injected-lib-pdfjs-worker').textContent") || !setup.includes('new Blob') || !setup.includes('URL.createObjectURL') || !setup.includes('GlobalWorkerOptions.workerSrc')) return { ok: false, errors: ['PDF.js worker setup must derive a Blob URL from the embedded worker payload.'] };
+        if (/workerSrc\s*=\s*["'](?:https?:|\.?\/|[^"']+\.js)/i.test(setup)) return { ok: false, errors: ['PDF.js worker setup references an external or relative worker resource.'] };
+      }
       const duplicateIds = [], seen = new Set();
       html.replace(/id=["'](injected-lib-[^"']+)["']/gi, (_, id) => { if (seen.has(id)) duplicateIds.push(id); seen.add(id); return _; });
       return duplicateIds.length ? { ok: false, errors: ['Duplicate injected library id(s): ' + duplicateIds.join(', ')] } : { ok: true, errors: [] };
@@ -3923,11 +3936,14 @@ Prism.languages.js = Prism.languages.javascript;
               return `<script id="injected-${libId}">\n${escapeScriptTextForHtml(content)}\n<\/script>\n` +
                      `<script id="injected-${libId}-worker" type="text/plain">\n${escapeScriptTextForHtml(workerContent)}\n<\/script>\n` +
                      `<script id="injected-${libId}-setup">\n` +
-                     `if (typeof window !== 'undefined' && window.pdfjsLib) {\n` +
+                     `(function(){\n` +
+                     `  if (typeof window === 'undefined' || !window.pdfjsLib) return;\n` +
+                     `  if (window.__htmlIdePdfjsWorkerUrl) URL.revokeObjectURL(window.__htmlIdePdfjsWorkerUrl);\n` +
                      `  const workerContent = document.getElementById('injected-${libId}-worker').textContent;\n` +
-                     `  const blob = new Blob([workerContent], { type: 'text/javascript' });\n` +
-                     `  window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);\n` +
-                     `}\n` +
+                     `  const workerBlob = new Blob([workerContent], { type: 'text/javascript' });\n` +
+                     `  window.__htmlIdePdfjsWorkerUrl = URL.createObjectURL(workerBlob);\n` +
+                     `  window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.__htmlIdePdfjsWorkerUrl;\n` +
+                     `})();\n` +
                      `<\/script>`;
             });
           } else {
