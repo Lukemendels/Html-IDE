@@ -670,7 +670,7 @@ The IDE contains preloaded offline library assets. You can inject them instantly
 *IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag. The compilation packer will automatically inline the full library code on preview or download.
 
 ## Create Mode
-For a brand-new app, return exactly one complete HTML document and no Markdown fences or commentary. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
+For a brand-new app, return exactly one complete HTML document inside a single ```html fence, with no commentary outside the fence. The IDE automatically unwraps the fence when the fenced document is pasted as the whole workspace. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
 
 ## Companion Tool Skill
 Every exported tool may carry an editable companion skill in this source-resident block, placed just before `</body>`:
@@ -688,9 +688,10 @@ description: ...
 In create mode, include it for StickShift tools. Include frontmatter, when to use the tool, its inputs/outputs, clipboard or packet contracts, and the standard open-instructions footer. `{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are substituted at export. In edit mode, patch its text normally or use `replace_region` on `tool-skill`; skill and code patches share the same hash and atomicity. Never write a literal closing-script token in it—write `<\/script` instead. This differs from `app-skill`, which is an app runtime LLM workflow; `tool-skill` is the StickShift companion installed as `skills/{{SKILL_SLUG}}.md`. Both may coexist.
 
 ## How the Agent Edits Code
-For edits to an existing app, generate a structured JSON `html-ide-patch` version `2.0` packet by default. The user will paste it into the AI Update Drawer. Include the exact current source hash supplied by the IDE/user as `target.sourceHash`, unique patch ids, explicit `expectedMatches`, and exact search text. Supported operations are `replace`, `insert_before`, `insert_after`, `delete`, and `replace_region` using `<!-- HTML_IDE_REGION:name:start -->` / `<!-- HTML_IDE_REGION:name:end -->` markers.
+For edits to an existing app, return a structured JSON `html-ide-patch` version `2.0` packet inside a single ```json fence, with no commentary outside the fence. The AI Update Drawer automatically strips the fence. The user will paste it into the AI Update Drawer. Include the exact current source hash supplied by the IDE/user as `target.sourceHash`, unique patch ids, explicit `expectedMatches`, and exact search text. Supported operations are `replace`, `insert_before`, `insert_after`, `delete`, and `replace_region` using `<!-- HTML_IDE_REGION:name:start -->` / `<!-- HTML_IDE_REGION:name:end -->` markers.
 
 ### Structured AI Update Packet Format
+```json
 {
   "protocol": "html-ide-patch",
   "version": "2.0",
@@ -705,6 +706,7 @@ For edits to an existing app, generate a structured JSON `html-ide-patch` versio
   ]
 }
 
+```
 ### Rules for Generating Packets:
 1. **Exact Matches Only**: In v2.0, `matching.strategy` must be `exact`; do not request indentation or whitespace-normalized matching.
 2. **No Ambiguity**: If a search block appears more than once, add stable surrounding context or use a named region; do not rely on first occurrence.
@@ -3246,8 +3248,14 @@ Prism.languages.js = Prism.languages.javascript;
   async function sourceHash(source) { return 'sha256:' + await sha256Hex(source); }
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
+  function stripCodeFences(text) {
+    const trimmed = String(text || '').trim();
+    const match = trimmed.match(/^```[a-zA-Z0-9_-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/);
+    return match ? match[1].trim() : trimmed;
+  }
+
   function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(packetText).split('\n');
+    const lines = normalizeNewlines(stripCodeFences(packetText)).split('\n');
     let blocks = [], currentBlock = null, stateMode = 'IDLE';
     for (const line of lines) {
       const trimmed = line.trim();
@@ -3268,8 +3276,8 @@ Prism.languages.js = Prism.languages.javascript;
   }
 
   function parsePatchPacket(packetText) {
-    const trimmed = String(packetText || '').trim();
-    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
+    const trimmed = stripCodeFences(packetText);
+    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(trimmed);
     let parsed;
     try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
     if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
@@ -3410,7 +3418,7 @@ Prism.languages.js = Prism.languages.javascript;
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, stripCodeFences, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });
 
 
@@ -3584,7 +3592,17 @@ Prism.languages.js = Prism.languages.javascript;
     triggerLivePreview();
 
     // Monitor input changes in the editor
+    function unwrapFencedDocument(code) {
+      const trimmed = String(code || '').trim();
+      const match = trimmed.match(/^```[a-zA-Z0-9_-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/);
+      return match && /<!doctype html|<html\b/i.test(match[1]) ? match[1] : null;
+    }
     jar.onUpdate((newCode) => {
+      const unwrapped = unwrapFencedDocument(newCode);
+      if (unwrapped !== null) {
+        jar.updateCode(unwrapped);
+        newCode = unwrapped;
+      }
       state.code = newCode;
       syncLineNumbers();
       triggerLivePreview();
@@ -3783,11 +3801,32 @@ Prism.languages.js = Prism.languages.javascript;
     function isDataScriptOpenTag(openTag) {
       return /type\s*=\s*["']?(?:text\/(?:plain|markdown)|application\/json)/i.test(openTag);
     }
+    function maskDataScriptBlocks(html) {
+      const blocks = [];
+      let index = 0;
+      const masked = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, block => {
+        const openTag = block.match(/^<script\b[^>]*>/i)[0];
+        if (!isDataScriptOpenTag(openTag)) return block;
+        let sentinel;
+        do { sentinel = `\u0000HTMLIDE_DATA_BLOCK_${index++}\u0000`; } while (html.includes(sentinel));
+        blocks.push([sentinel, block]);
+        return sentinel;
+      });
+      return { masked, restore: value => blocks.reduce((result, [sentinel, block]) => result.split(sentinel).join(block), value) };
+    }
+    // Without region markers a malformed skill's intended closing tag is ambiguous;
+    // agents must still escape closing-script tokens as the primary defense.
+    function escapeToolSkillRegionBreakouts(html) {
+      return html.replace(/(<!-- HTML_IDE_REGION:tool-skill:start -->)([\s\S]*?)(<!-- HTML_IDE_REGION:tool-skill:end -->)/gi, (_, start, region, end) =>
+        start + region.replace(/(<script\b[^>]*>)([\s\S]*)(<\/script>)/i, (script, open, markdown, close) =>
+          open + markdown.replace(/<\/script/gi, '<\\/script') + close) + end);
+    }
     function toolSkillBlocks(html) { return [...html.matchAll(TOOL_SKILL_RE)]; }
     function stripToolSkillRegionMarkers(html) {
       return html.replace(/\s*<!-- HTML_IDE_REGION:tool-skill:(?:start|end) -->/gi, '');
     }
     function normalizeAuthoredToolSkill(html, toolFileName) {
+      html = escapeToolSkillRegionBreakouts(html);
       const baseName = toolFileName.replace(/\.html?$/i, '');
       const skillSlug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const toolTitle = baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -3813,12 +3852,12 @@ Prism.languages.js = Prism.languages.javascript;
         const canonical = `<!-- HTML_IDE_REGION:tool-skill:start -->\n<script type="text/markdown" id="tool-skill">${legacySkill[1]}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`;
         cleanedHtml = cleanedHtml.replace(legacySkill[0], canonical);
       } else {
-        cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/gi, '');
+        cleanedHtml = cleanedHtml.replace(/\s*<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<!-- STICKSHIFT_SKILL_END -->\s*(?=<)/gi, '');
       }
-      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_CSS_START -->[\s\S]*?<!-- STICKSHIFT_CSS_END -->/gi, '');
-      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_TRIGGER_START -->[\s\S]*?<!-- STICKSHIFT_TRIGGER_END -->/gi, '');
-      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_PANEL_START -->[\s\S]*?<!-- STICKSHIFT_PANEL_END -->/gi, '');
-      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_JS_START -->[\s\S]*?<!-- STICKSHIFT_JS_END -->/gi, '');
+      cleanedHtml = cleanedHtml.replace(/\s*<!-- STICKSHIFT_CSS_START -->[\s\S]*?<!-- STICKSHIFT_CSS_END -->\s*(?=<)/gi, '');
+      cleanedHtml = cleanedHtml.replace(/\s*<!-- STICKSHIFT_TRIGGER_START -->[\s\S]*?<!-- STICKSHIFT_TRIGGER_END -->\s*(?=<)/gi, '');
+      cleanedHtml = cleanedHtml.replace(/\s*<!-- STICKSHIFT_PANEL_START -->[\s\S]*?<!-- STICKSHIFT_PANEL_END -->\s*(?=<)/gi, '');
+      cleanedHtml = cleanedHtml.replace(/\s*<!-- STICKSHIFT_JS_START -->[\s\S]*?<!-- STICKSHIFT_JS_END -->\s*(?=<)/gi, '');
       return cleanedHtml;
     }
 
@@ -3913,7 +3952,8 @@ Prism.languages.js = Prism.languages.javascript;
 
     // Pack Libraries: replaces stems with full inlined library content
     function packLibraries(html) {
-      let packedHtml = html;
+      const dataMask = maskDataScriptBlocks(html);
+      let packedHtml = dataMask.masked;
 
       const libIds = [
         'lib-alpine', 'lib-picocss', 'lib-jszip', 'lib-docxtemplater',
@@ -3953,10 +3993,11 @@ Prism.languages.js = Prism.languages.javascript;
         }
       });
 
-      return packedHtml;
+      return dataMask.restore(packedHtml);
     }
 
     function compileAppSource(editableSource, options = {}) {
+      editableSource = escapeToolSkillRegionBreakouts(editableSource);
       if (toolSkillBlocks(editableSource).length > 1) throw new Error('Compiled app validation failed:\nMultiple tool-skill blocks found; a tool may carry exactly one companion skill.');
       let compiled = packLibraries(escapeInlineScriptBreakouts(editableSource));
       const fileName = options.fileName || state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
@@ -4065,9 +4106,10 @@ The tool workspace supports offline library stems. You can request any of these 
 *IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag.
 
 ## How the Agent Edits Code
-Generate a structured JSON \`html-ide-patch\` version \`2.0\` packet by default. Use the source hash from the user's patch context, unique patch ids, \`matching.strategy: "exact"\`, explicit \`expectedMatches\`, and one of: \`replace\`, \`insert_before\`, \`insert_after\`, \`delete\`, or \`replace_region\`. Legacy SEARCH/REPLACE blocks are accepted only as a compatibility fallback and lack hash protection.
+Return a structured JSON \`html-ide-patch\` version \`2.0\` packet inside a single \`\`\`json fence, with no commentary outside the fence. The AI Update Drawer automatically strips the fence. Use the source hash from the user's patch context, unique patch ids, \`matching.strategy: "exact"\`, explicit \`expectedMatches\`, and one of: \`replace\`, \`insert_before\`, \`insert_after\`, \`delete\`, or \`replace_region\`. Legacy SEARCH/REPLACE blocks are accepted only as a compatibility fallback and lack hash protection.
 
 ### Format
+\`\`\`json
 {
   "protocol": "html-ide-patch",
   "version": "2.0",
@@ -4081,6 +4123,7 @@ Generate a structured JSON \`html-ide-patch\` version \`2.0\` packet by default.
     }
   ]
 }
+\`\`\`
 
 ### Rules
 1. Use exact matching only in v2.0.
@@ -4335,7 +4378,7 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
         availableLibraryStemManifest(),
         '',
         '## Required v2 patch output contract',
-        'Return only JSON. Use protocol "html-ide-patch", version "2.0", target.sourceHash above, unique patch ids, matching.strategy "exact", expectedMatches, and operations replace, insert_before, insert_after, delete, or replace_region.',
+        'Return only one html-ide-patch v2 JSON packet inside a single ```json fence, with no commentary outside the fence. Use protocol "html-ide-patch", version "2.0", target.sourceHash above, unique patch ids, matching.strategy "exact", expectedMatches, and operations replace, insert_before, insert_after, delete, or replace_region.',
         '',
         '## Current editable HTML',
         state.code

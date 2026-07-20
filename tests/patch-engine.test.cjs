@@ -10,6 +10,12 @@ async function reject(label, promise, pattern) { await assert.rejects(promise, p
 (async () => {
   const source = '<!doctype html>\n<main>\n<h1>Title</h1>\n<button>Save</button>\n<p>End</p>\n</main>';
 
+  const fencedPacket = '```json\n' + await packet(source, [p('fenced', 'replace', '<h1>Title</h1>', '<h1>Fenced</h1>')]) + '\n```';
+  let fencedReport = await engine.preflightPatchPacket(fencedPacket, source);
+  assert(fencedReport.output.includes('<h1>Fenced</h1>'), 'fenced JSON packet preflights and applies');
+  assert.equal(engine.stripCodeFences('  plain text  '), 'plain text', 'unfenced input passes through trimmed');
+  assert.equal(engine.stripCodeFences('```\ninside\n```'), 'inside', 'bare fence strips');
+
   let report = await engine.preflightPatchPacket(await packet(source, [p('replace-title', 'replace', '<h1>Title</h1>', '<h1>New</h1>')]), source);
   assert(report.output.includes('<h1>New</h1>'), 'valid exact replacement');
 
@@ -21,6 +27,12 @@ async function reject(label, promise, pattern) { await assert.rejects(promise, p
 
   report = await engine.preflightPatchPacket(await packet(source, [p('delete-button', 'delete', '<button>Save</button>')]), source);
   assert(!report.output.includes('<button>Save</button>'), 'delete');
+
+  const skillSource = '<!-- HTML_IDE_REGION:tool-skill:start --><script id="tool-skill" type="text/markdown">old skill</script><!-- HTML_IDE_REGION:tool-skill:end -->';
+  report = await engine.preflightPatchPacket(await packet(skillSource, [p('edit-skill', 'replace', 'old skill', 'new skill')]), skillSource);
+  assert(report.output.includes('new skill'), 'replace edits text inside tool-skill block');
+  report = await engine.preflightPatchPacket(await packet(skillSource, [{ id: 'rewrite-skill', operation: 'replace_region', matching: { strategy: 'exact', expectedMatches: 1, region: 'tool-skill' }, replacement: '<script id="tool-skill" type="text/markdown">rewritten</script>' }]), skillSource);
+  assert(report.output.includes('rewritten'), 'replace_region rewrites tool-skill block');
 
   const regionSource = '<!-- HTML_IDE_REGION:hero:start -->old<!-- HTML_IDE_REGION:hero:end -->';
   report = await engine.preflightPatchPacket(await packet(regionSource, [{ id: 'region', operation: 'replace_region', matching: { strategy: 'exact', expectedMatches: 1, region: 'hero' }, replacement: 'new' }]), regionSource);

@@ -18,8 +18,14 @@
   async function sourceHash(source) { return 'sha256:' + await sha256Hex(source); }
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
+  function stripCodeFences(text) {
+    const trimmed = String(text || '').trim();
+    const match = trimmed.match(/^```[a-zA-Z0-9_-]*[ \t]*\r?\n([\s\S]*?)\r?\n?```$/);
+    return match ? match[1].trim() : trimmed;
+  }
+
   function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(packetText).split('\n');
+    const lines = normalizeNewlines(stripCodeFences(packetText)).split('\n');
     let blocks = [], currentBlock = null, stateMode = 'IDLE';
     for (const line of lines) {
       const trimmed = line.trim();
@@ -40,8 +46,8 @@
   }
 
   function parsePatchPacket(packetText) {
-    const trimmed = String(packetText || '').trim();
-    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
+    const trimmed = stripCodeFences(packetText);
+    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(trimmed);
     let parsed;
     try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
     if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
@@ -182,5 +188,5 @@
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, stripCodeFences, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });

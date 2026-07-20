@@ -16,7 +16,7 @@ const vault = {
   'lib-pdfjs-worker': { textContent: fs.readFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.js', 'utf8') }
 };
 const api = new Function('localStorage', 'document', sourceHelpers + '\n' + logic +
-  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderSkillMarkdown, escapeInlineScriptBreakouts, unpackInlinedLibraries, normalizeAuthoredToolSkill, toolSkillBlocks, packLibraries, validateCompiledAppHtml, SS_KEYS };')(global.localStorage, { getElementById: id => vault[id] || null });
+  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderSkillMarkdown, escapeInlineScriptBreakouts, unpackInlinedLibraries, normalizeAuthoredToolSkill, toolSkillBlocks, packLibraries, validateCompiledAppHtml, escapeToolSkillRegionBreakouts, maskDataScriptBlocks, SS_KEYS };')(global.localStorage, { getElementById: id => vault[id] || null });
 
 let fail = 0;
 const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) fail++; };
@@ -84,12 +84,29 @@ const cleanHtml = '<html><body><script>\nconsole.log("all good");\n' + CLOSE + '
 const cleanFindings = api.detectScriptBreakouts(cleanHtml);
 check('detectScriptBreakouts ignores clean scripts and data blocks', cleanFindings.length === 0);
 
+const rawSkillFixture = '<!doctype html><html><body><!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">Example ' + CLOSE + ' AFTER-TOKEN\n</script>\n<!-- HTML_IDE_REGION:tool-skill:end --><div id="after-region"></div></body></html>';
+const rescuedSkill = api.escapeToolSkillRegionBreakouts(rawSkillFixture);
+const rescuedBlocks = api.toolSkillBlocks(rescuedSkill);
+check('region breakout rescue keeps raw skill markdown in one block and is idempotent', rescuedBlocks.length === 1 && rescuedBlocks[0][1].includes('AFTER-TOKEN') && rescuedBlocks[0][1].includes('<\\/script') && api.escapeToolSkillRegionBreakouts(rescuedSkill) === rescuedSkill);
+const rescuedInjected = api.injectStickShiftCompliance(rawSkillFixture, 'rescued.html');
+const injectedBlock = api.toolSkillBlocks(rescuedInjected)[0];
+check('injection preserves rescued skill and keeps following content outside it', injectedBlock && injectedBlock[1].includes('AFTER-TOKEN') && !injectedBlock[1].includes('after-region') && rescuedInjected.includes('<div id="after-region"></div>'));
+const maskFixture = '<script id="lib-jszip-stem"></script><script type="text/markdown" id="tool-skill">Example <script id="lib-jszip-stem"></script></script>';
+const dataMask = api.maskDataScriptBlocks(maskFixture);
+const simulatedPacked = dataMask.masked.replace(/<script id="lib-jszip-stem"><\/script>/, '<script id="injected-lib-jszip">PACKED</script>');
+const restoredMask = dataMask.restore(simulatedPacked);
+check('data block masking restores byte-identically and protects quoted stems', !dataMask.masked.includes('Example') && dataMask.restore(dataMask.masked) === maskFixture && restoredMask.includes('id="injected-lib-jszip"') && restoredMask.includes('Example <script id="lib-jszip-stem"></script>'));
 const authored = '<!doctype html><html><body><!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">---\nname: {{SKILL_SLUG}}\n---\nDon\'t lose `&lt;\\/script` or {{TOOL_TITLE}} / {{TOOL_FILE}}.\n</script>\n<!-- HTML_IDE_REGION:tool-skill:end --><div id="sentinel"></div></body></html>';
 const authoredInjected = api.injectStickShiftCompliance(authored, 'my-tool.html');
 check('authored tool skill substituted and normalized', authoredInjected.includes('id="tool-skill" data-skill-slug="my-tool"') && authoredInjected.includes('My Tool / my-tool.html'));
 check('authored skill does not inject legacy skill', !authoredInjected.includes('STICKSHIFT_SKILL_START'));
 check('authored panel copies authored skill', authoredInjected.includes("getElementById('tool-skill').innerHTML"));
 check('authored payload retains compliance UI', ['STICKSHIFT_CSS_START', 'STICKSHIFT_TRIGGER_START', 'STICKSHIFT_PANEL_START', 'STICKSHIFT_JS_START'].every(x => authoredInjected.includes(x)));
+const normalizedOnly = api.normalizeAuthoredToolSkill(authored, 'my-tool.html');
+check('SS-off normalization strips region markers and substitutes placeholders', !normalizedOnly.includes('HTML_IDE_REGION:tool-skill') && normalizedOnly.includes('id="tool-skill" data-skill-slug="my-tool"') && normalizedOnly.includes('My Tool / my-tool.html'));
+const roundTripInjected = api.injectStickShiftCompliance(authored, 'my-tool.html');
+check('compile import round trip is byte-stable', roundTripInjected === api.injectStickShiftCompliance(api.unpackInlinedLibraries(roundTripInjected), 'my-tool.html'));
+
 const dataFixture = '<script type="text/markdown" id="tool-skill">don\'t `</div>`</script><script>var x = "</script>";</script>';
 const dataEscaped = api.escapeInlineScriptBreakouts(dataFixture);
 check('data blocks bypass JS breakout scanner', dataEscaped.startsWith('<script type="text/markdown" id="tool-skill">don\'t `</div>`</script>') && dataEscaped.includes('"<\\/script>"'));

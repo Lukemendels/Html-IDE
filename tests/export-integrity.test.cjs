@@ -27,6 +27,15 @@ function extractFunction(name) {
 }
 const helpers = new Function(`${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)();
 
+const packHelpers = new Function(`${extractFunction('isDataScriptOpenTag')}\n${extractFunction('maskDataScriptBlocks')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('packLibraries')}\nreturn { packLibraries };`)();
+const originalDocument = global.document;
+global.document = { getElementById: id => ({ textContent: 'FAKE_LIB_' + id }) };
+const packedFixture = packHelpers.packLibraries('<head><script id="lib-jszip-stem"></script></head><body><script type="text/markdown" id="tool-skill">Example <script id="lib-jszip-stem"></script></script></body>');
+global.document = originalDocument;
+assert.equal((packedFixture.match(/id="injected-lib-jszip"/g) || []).length, 1, 'real stem is packed once');
+assert(packedFixture.includes('Example <script id="lib-jszip-stem"></script>'), 'quoted data-block stem remains untouched');
+assert(!packedFixture.includes('\u0000HTMLIDE_DATA_BLOCK_'), 'data-block sentinels do not leak');
+
 const adversarialJs = 'const a = "</script>"; const b = "</ScRiPt>"; const c = `<div></script></div>`; const d = JSON.stringify({ html: "</script>" });';
 const escapedJs = helpers.escapeScriptTextForHtml(adversarialJs);
 assert(!/<\/script/i.test(escapedJs), 'script payload escaping removes literal closing script tokens');
