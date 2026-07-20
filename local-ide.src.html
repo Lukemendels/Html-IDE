@@ -1056,8 +1056,10 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       const errors=[];
       if (descriptor.schema !== 'stickshift-tool' || descriptor.version !== '1.0') errors.push('Tool Descriptor must use schema "stickshift-tool" and version "1.0".');
       if (typeof descriptor.file !== 'string' || !descriptor.file.trim()) errors.push('Tool Descriptor file must be a non-empty string.');
+      if (typeof descriptor.skillSlug !== 'string' || !descriptor.skillSlug.trim()) errors.push('Tool Descriptor skillSlug must be a non-empty string.');
       if (typeof descriptor.title !== 'string' || typeof descriptor.description !== 'string') errors.push('Tool Descriptor title and description must be strings.');
       if (!descriptor.open || descriptor.open.protocol !== 'HTML_OPEN' || typeof descriptor.open.tool !== 'string' || !descriptor.open.tool.trim()) errors.push('Tool Descriptor open must contain protocol "HTML_OPEN" and a non-empty tool reference.');
+      else if (descriptor.open.tool !== descriptor.file) errors.push('Tool Descriptor open.tool must match file.');
       if (!(descriptor.skill === null || (descriptor.skill && descriptor.skill.elementId === 'tool-skill' && typeof descriptor.skill.slug === 'string'))) errors.push('Tool Descriptor skill must be null or { elementId: "tool-skill", slug: string }.');
       return errors.length ? {ok:false, errors} : {ok:true, descriptor, match:blocks[0]};
     }
@@ -1069,7 +1071,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       for (const m of skills) if (/<\/script/i.test(m[1])) errors.push('A Tool Skill contains an unescaped closing-script token.');
       if (descriptorResult.ok && descriptorResult.descriptor) {
         if (descriptorResult.descriptor.skill === null && skills.length) errors.push('Tool Descriptor declares skill: null but a Tool Skill exists. Update the descriptor or remove the Tool Skill.');
-        if (descriptorResult.descriptor.skill !== null && skills.length !== 1) errors.push('Tool Descriptor references a Tool Skill but exactly one tool-skill block is required.');
+        if (descriptorResult.descriptor.skill !== null && skills.length !== 1 && !html.includes('STICKSHIFT_COMPATIBILITY_START')) errors.push('Tool Descriptor references a Tool Skill but exactly one tool-skill block is required.');
       } else if (skills.length) errors.push('A Tool Skill requires a Tool Descriptor that references it.');
       if (compiled && [...toolDescriptorBlocks(html), ...toolSkillBlocks(html)].some(m => /\{\{(?:TOOL_FILE|TOOL_TITLE|SKILL_SLUG)\}\}/.test(m[1]))) errors.push('Compiled integration output contains unresolved placeholders.');
       return {ok:!errors.length, errors, descriptor:descriptorResult.descriptor || null, hasSkill:skills.length === 1};
@@ -1084,7 +1086,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem"><\/script>`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
       const legacy=cleaned.match(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<script\b(?=[^>]*\bid\s*=\s*["']stickshift-skill["'])[^>]*>([\s\S]*?)<\/script>[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/i);
       if (legacy && !toolSkillBlocks(cleaned).length && legacy[1].trim() && !/^\s*(?:<HTML_OPEN>|tool:|include:)/im.test(legacy[1])) {
-        const id=toolIdentity('imported.html'); const d={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',title:'{{TOOL_TITLE}}',description:'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}};
+        const id=toolIdentity('imported.html'); const d={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}};
         cleaned=cleaned.replace(legacy[0],`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${legacy[1]}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`); if(!toolDescriptorBlocks(cleaned).length) cleaned=replaceDescriptor(cleaned,d);
       } else cleaned=cleaned.replace(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/gi,'');
       return cleaned.replace(/<!-- STICKSHIFT_(?:CSS|TRIGGER|PANEL|JS)_START -->[\s\S]*?<!-- STICKSHIFT_(?:CSS|TRIGGER|PANEL|JS)_END -->/gi,'');
@@ -1123,15 +1125,34 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       const dataMask = maskDataScriptBlocks(html);
       let packedHtml=dataMask.html; ['lib-alpine','lib-picocss','lib-jszip','lib-docxtemplater','lib-docx','lib-mammoth','lib-sheetjs','lib-pptxgen','lib-pdfjs'].forEach(libId=>{const c=document.getElementById(libId); if(!c)return; const text=c.textContent; if(libId==='lib-picocss') packedHtml=packedHtml.replace(new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`,'gi'),`<style id="injected-${libId}">${text}</style>`); else if(libId==='lib-pdfjs'){const w=document.getElementById('lib-pdfjs-worker'); packedHtml=packedHtml.replace(new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi'),`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script><script id="injected-${libId}-worker" type="text/plain">${escapeScriptTextForHtml(w?w.textContent:'')}<\/script><script id="injected-${libId}-setup">(function(){if(typeof window==='undefined'||!window.pdfjsLib)return;if(window.__htmlIdePdfjsWorkerUrl)URL.revokeObjectURL(window.__htmlIdePdfjsWorkerUrl);var x=document.getElementById('injected-lib-pdfjs-worker').textContent;var u=URL.createObjectURL(new Blob([x],{type:'text/javascript'}));window.__htmlIdePdfjsWorkerUrl=u;window.pdfjsLib.GlobalWorkerOptions.workerSrc=u})()<\/script>`)} else packedHtml=packedHtml.replace(new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi'),`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script>`)}); return dataMask.restore(packedHtml);
     }
+    function legacySkillMarkdown(descriptor, identity, authored) {
+      const body = authored || `# ${descriptor.title}\n\nUse this local HTML tool when the user wants to open or use ${descriptor.title}.`;
+      const normalized = body.replace(/^---[\s\S]*?---\s*/,'').trim();
+      return `---\nslug: ${descriptor.skillSlug}\ntitle: ${descriptor.title}\ndescription: ${descriptor.description}\n---\n\n${normalized}\n\n<HTML_OPEN>\ntool: ${identity.file}\n</HTML_OPEN>\n\nCopy the block above and click Open HTML Tool in StickShift.`;
+    }
     function injectStickShiftCompliance(html,fileName) {
-      if(html.includes('STICKSHIFT_TOOL_SETUP'))return html; const check=validateToolIntegration(html,false); if(!check.ok)throw new Error(check.errors.join('\n')); if(!check.descriptor)return html;
-      const d=check.descriptor,i=toolIdentity(fileName), skill=check.hasSkill, open=`<HTML_OPEN>\ntool: ${d.open.tool}\n${skill?`include:\n- skills/${d.skill.slug}.md\n`:''}</HTML_OPEN>`;
-      const copy=skill?`<button id="ss-copy-skill" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('tool-skill').textContent)">Copy Tool Skill</button>`:'<p>No Tool Skill is required for this tool.</p>';
-      const payload=`<!-- STICKSHIFT_TOOL_SETUP --><button id="ss-trigger" onclick="document.getElementById('ss-panel').hidden=false">Tool Setup</button><div id="ss-panel" hidden><pre>${open}</pre>${copy}</div><script>var STICKSHIFT_TOOL=${JSON.stringify({file:d.file,title:d.title,skill:skill})};<\/script>`;
+      if(html.includes('STICKSHIFT_COMPATIBILITY_START'))return html;
+      const check=validateToolIntegration(html,false); if(!check.ok)throw new Error(check.errors.join('\n')); if(!check.descriptor)return html;
+      const identity=toolIdentity(fileName), d={...check.descriptor,file:identity.file,skillSlug:check.descriptor.skillSlug==='{{SKILL_SLUG}}'?identity.slug:check.descriptor.skillSlug,title:check.descriptor.title==='{{TOOL_TITLE}}'?identity.title:check.descriptor.title};
+      const authored=check.hasSkill ? toolSkillBlocks(html)[0][1] : null;
+      html=html.replace(TOOL_SKILL_RE,'');
+      const skill=legacySkillMarkdown(d,identity,authored);
+      const kind=authored?'authored':'registration';
+      const payload=`<!-- STICKSHIFT_COMPATIBILITY_START -->
+<script>const STICKSHIFT_TOOL = { file: ${JSON.stringify(identity.file)}, skillSlug: ${JSON.stringify(d.skillSlug)}, title: ${JSON.stringify(d.title)} };</script>
+<script type="text/markdown" id="stickshift-skill" data-skill-slug="${d.skillSlug}" data-skill-kind="${kind}">${skill.replace(/<\/script/gi,'<\\/script')}</script>
+<button id="ss-trigger" type="button" onclick="document.getElementById('ss-panel').hidden=false">StickShift</button>
+<div id="ss-panel" hidden aria-label="StickShift onboarding"><p>StickShift setup — this tool also works standalone.</p><p>Are you using StickShift?</p><section><strong>Yes</strong>: use <em>Install HTML Tool</em>. <button id="ss-copy-skill">Copy Skill</button></section><section><strong>No</strong>: use this HTML file standalone immediately.</section><pre id="ss-copy-manual" hidden></pre></div>
+<script>(function(){function legacyCopy(text){return new Promise(function(resolve,reject){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();try{var copied=document.execCommand('copy');document.body.removeChild(ta);if(copied)resolve();else reject(new Error('Copy command failed.'));}catch(error){document.body.removeChild(ta);reject(error);}})}function copyText(text){if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(text).catch(function(){return legacyCopy(text)});return legacyCopy(text)}document.getElementById('ss-copy-skill').addEventListener('click',function(){var text=document.getElementById('stickshift-skill').textContent;copyText(text).catch(function(){var manual=document.getElementById('ss-copy-manual');manual.hidden=false;manual.textContent=text;alert('Copy failed. Select and copy the skill text shown.');});});})();</script>
+<!-- STICKSHIFT_COMPATIBILITY_END -->`;
       const at=documentEndIndex(html); return html.slice(0,at)+payload+html.slice(at);
     }
-    function validateCompiledAppHtml(html) { const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html))return {ok:false,errors:['No fallback stickshift-skill may be injected.']}; const stem=html.match(/<(?:script|link)\b[^>]*id=["']lib-[^"']+-stem["'][^>]*>/i); return stem?{ok:false,errors:['Unresolved library stem remains.']}:{ok:true,errors:[]}; }
-    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; let html=packLibraries(escapeInlineScriptBreakouts(editableSource)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const v=validateCompiledAppHtml(html); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
+    function validateLegacyCompatibility(html,fileName) {
+      const ids=[...html.matchAll(/const\s+STICKSHIFT_TOOL\s*=\s*\{\s*file:\s*"([^"]+)",\s*skillSlug:\s*"([^"]+)",\s*title:\s*"([^"]+)"\s*\}/g)]; const skills=[...html.matchAll(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*type="text\/markdown")(?=[^>]*data-skill-slug="([^"]+)")[^>]*>([\s\S]*?)<\/script>/g)];
+      const errors=[]; if(ids.length!==1)errors.push('Expected exactly one const STICKSHIFT_TOOL declaration.'); if(skills.length!==1)errors.push('Expected exactly one stickshift-skill block.'); if(ids.length&&skills.length){const [,file,slug,title]=ids[0], skillSlug=skills[0][1], markdown=skills[0][2]; if(file!==fileName)errors.push('Legacy identity file does not match download filename.'); if(slug!==skillSlug)errors.push('Legacy identity slug does not match embedded skill.'); if(!markdown.includes('slug: '+slug)||!markdown.includes('title: '+title)||!markdown.includes('description: ')||!markdown.includes('tool: '+file))errors.push('Legacy skill frontmatter or HTML_OPEN block does not match identity.');} if(!html.includes("getElementById('stickshift-skill').textContent")||!html.includes("execCommand('copy')"))errors.push('Legacy copy fallback is incomplete.'); return {ok:!errors.length,errors};
+    }
+    function validateCompiledAppHtml(html) { const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html) && !html.includes('STICKSHIFT_COMPATIBILITY_START'))return {ok:false,errors:['Unexpected legacy skill block.']}; const stem=html.match(/<(?:script|link)\b[^>]*id=["']lib-[^"']+-stem["'][^>]*>/i); return stem?{ok:false,errors:['Unresolved library stem remains.']}:{ok:true,errors:[]}; }
+    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; let html=packLibraries(escapeInlineScriptBreakouts(editableSource)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
 
 
     // Sync Library Indicators on UI Accordion
@@ -1398,7 +1419,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function commitSource(next) { state.code = next; jar.updateCode(next); syncLineNumbers(); syncLibraryIndicators(); triggerLivePreview(); refreshSourceHashDisplay(); }
     elements.toolDescriptorEdit.addEventListener('click', () => {
       const parsed = parseToolDescriptor(state.code); const identity = toolIdentity(state.currentFileName);
-      const initial = parsed.descriptor || {schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',title:'{{TOOL_TITLE}}',description:'Describe this tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:null};
+      const initial = parsed.descriptor || {schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:'Describe this tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:null};
       const raw = prompt('Tool Descriptor JSON (canonical source block):', JSON.stringify(initial, null, 2)); if (raw === null) return;
       try { const descriptor = JSON.parse(raw); const next = replaceDescriptor(state.code, descriptor); const check=validateToolIntegration(next,false); if(!check.ok) throw new Error(check.errors.join('\n')); commitSource(next); } catch(e) { alert('Descriptor not saved: '+e.message); }
     });
