@@ -4,14 +4,15 @@ const start = src.indexOf('const SS_KEYS');
 const end = src.indexOf('// Pack Offline Libraries UI Event Handlers');
 if (start === -1 || end === -1) { console.error('FAIL: logic block not found'); process.exit(1); }
 const logic = src.slice(start, end);
+const sourceHelpers = src.slice(src.indexOf('    // Source-resident companion skill helpers.'), src.indexOf('    // Sync Library Indicators'));
 const store = {};
 global.localStorage = {
   getItem: k => (k in store ? store[k] : null),
   setItem: (k, v) => { store[k] = String(v); },
   removeItem: k => { delete store[k]; }
 };
-const api = new Function('localStorage', logic +
-  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderSkillMarkdown, SS_KEYS };')(global.localStorage);
+const api = new Function('localStorage', sourceHelpers + '\n' + logic +
+  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderSkillMarkdown, escapeInlineScriptBreakouts, unpackInlinedLibraries, normalizeAuthoredToolSkill, toolSkillBlocks, SS_KEYS };')(global.localStorage);
 
 let fail = 0;
 const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) fail++; };
@@ -78,6 +79,21 @@ const cleanHtml = '<html><body><script>\nconsole.log("all good");\n' + CLOSE + '
   '</body></html>';
 const cleanFindings = api.detectScriptBreakouts(cleanHtml);
 check('detectScriptBreakouts ignores clean scripts and data blocks', cleanFindings.length === 0);
+
+const authored = '<!doctype html><html><body><!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">---\nname: {{SKILL_SLUG}}\n---\nDon\'t lose `&lt;\\/script` or {{TOOL_TITLE}} / {{TOOL_FILE}}.\n</script>\n<!-- HTML_IDE_REGION:tool-skill:end --><div id="sentinel"></div></body></html>';
+const authoredInjected = api.injectStickShiftCompliance(authored, 'my-tool.html');
+check('authored tool skill substituted and normalized', authoredInjected.includes('id="tool-skill" data-skill-slug="my-tool"') && authoredInjected.includes('My Tool / my-tool.html'));
+check('authored skill does not inject legacy skill', !authoredInjected.includes('STICKSHIFT_SKILL_START'));
+check('authored panel copies authored skill', authoredInjected.includes("getElementById('tool-skill').innerHTML"));
+check('authored payload retains compliance UI', ['STICKSHIFT_CSS_START', 'STICKSHIFT_TRIGGER_START', 'STICKSHIFT_PANEL_START', 'STICKSHIFT_JS_START'].every(x => authoredInjected.includes(x)));
+const dataFixture = '<script type="text/markdown" id="tool-skill">don\'t `</div>`</script><script>var x = "</script>";</script>';
+const dataEscaped = api.escapeInlineScriptBreakouts(dataFixture);
+check('data blocks bypass JS breakout scanner', dataEscaped.startsWith('<script type="text/markdown" id="tool-skill">don\'t `</div>`</script>') && dataEscaped.includes('"<\\/script>"'));
+const legacy = '<html><body><!-- STICKSHIFT_SKILL_START --><script type="text/markdown" id="stickshift-skill">legacy markdown</script><!-- STICKSHIFT_SKILL_END --><!-- STICKSHIFT_CSS_START -->x<!-- STICKSHIFT_CSS_END --><!-- STICKSHIFT_TRIGGER_START -->x<!-- STICKSHIFT_TRIGGER_END --><!-- STICKSHIFT_PANEL_START -->x<!-- STICKSHIFT_PANEL_END --><!-- STICKSHIFT_JS_START -->x<!-- STICKSHIFT_JS_END --></body></html>';
+const hoisted = api.unpackInlinedLibraries(legacy);
+check('legacy skill is hoisted into canonical source block', hoisted.includes('HTML_IDE_REGION:tool-skill:start') && hoisted.includes('id="tool-skill">legacy markdown</script>') && !hoisted.includes('STICKSHIFT_'));
+const noClobber = api.unpackInlinedLibraries(authored + legacy);
+check('legacy hoist does not clobber authored block', noClobber.includes('{{SKILL_SLUG}}') && !noClobber.includes('stickshift-skill'));
 
 if (fail > 0) {
   console.error(`\n${fail} check(s) FAILED`);
