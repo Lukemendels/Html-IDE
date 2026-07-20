@@ -1083,7 +1083,16 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     function normalizeAuthoredToolSkill(html, fileName) { return substituteIntegrationPlaceholders(html, fileName); }
     function unpackInlinedLibraries(html) {
       let cleaned=html.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>[\s\S]*?<\/script>/gi,'');
-      cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem"><\/script>`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
+      cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem"></script>`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
+      const compat=cleaned.match(/<!-- STICKSHIFT_COMPATIBILITY_START -->[\s\S]*?<!-- STICKSHIFT_COMPATIBILITY_END -->/i);
+      if (compat) {
+        const payload=compat[0], identity=payload.match(/const\s+STICKSHIFT_TOOL\s*=\s*\{\s*file:\s*"([^"]+)",\s*skillSlug:\s*"([^"]+)",\s*title:\s*"([^"]+)"/), skill=payload.match(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*data-skill-kind="([^"]+)")[^>]*>([\s\S]*?)<\/script>/i);
+        if (!identity || !skill) throw new Error('Cannot import malformed StickShift compatibility block.');
+        const [,file,slug,title]=identity, kind=skill[1], markdown=skill[2]; if(kind!=='registration'&&kind!=='authored')throw new Error('Unknown generated StickShift skill kind.');
+        const descriptor={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:(markdown.match(/^description:\s*(.+)$/m)||[])[1]||'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:kind==='authored'?{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}:null};
+        cleaned=replaceDescriptor(removeNamedRegion(cleaned.replace(payload,''),'tool-descriptor'),descriptor);
+        if(kind==='authored'){ const body=markdown.replace(/^---[\s\S]*?---\s*/,'').trim(); cleaned=replaceNamedRegion(cleaned,'tool-skill',`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${body}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`); }
+      }
       const legacy=cleaned.match(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<script\b(?=[^>]*\bid\s*=\s*["']stickshift-skill["'])[^>]*>([\s\S]*?)<\/script>[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/i);
       if (legacy && !toolSkillBlocks(cleaned).length && legacy[1].trim() && !/^\s*(?:<HTML_OPEN>|tool:|include:)/im.test(legacy[1])) {
         const id=toolIdentity('imported.html'); const d={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}};
@@ -1426,10 +1435,10 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     elements.toolSkillEdit.addEventListener('click', () => {
       const parsed=parseToolDescriptor(state.code), existing=toolSkillBlocks(state.code)[0];
       if (!parsed.descriptor) return alert('Add a Tool Descriptor before adding an optional Tool Skill.');
-      if (!existing) { const markdown=prompt('This tool does not currently include an LLM Tool Skill. Enter markdown to add one:', pendingLegacyToolSkill || '---\nname: {{SKILL_SLUG}}\ndescription: When an LLM should use this tool.\n---\n'); if(markdown===null)return; pendingLegacyToolSkill = ''; const d={...parsed.descriptor,skill:{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}}; let next=replaceDescriptor(state.code,d).replace(/<\/body>/i,`\n<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${markdown.replace(/<\/script/gi,'<\\/script')}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->\n</body>`); return commitSource(next); }
+      if (!existing) { const markdown=prompt('This tool does not currently include an LLM Tool Skill. Enter markdown to add one:', pendingLegacyToolSkill || '---\nname: {{SKILL_SLUG}}\ndescription: When an LLM should use this tool.\n---\n'); if(markdown===null)return; pendingLegacyToolSkill = ''; const d={...parsed.descriptor,skill:{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}}; const block=`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${markdown.replace(/<\/script/gi,'<\\/script')}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`; let next=insertNamedRegionBeforeDocumentEnd(replaceDescriptor(state.code,d),'tool-skill',block); return commitSource(next); }
       const markdown=prompt('Edit Tool Skill markdown. Leave empty to remove it.',existing[1]); if(markdown===null)return;
-      if(!markdown.trim()) { if(!confirm('Remove this Tool Skill?'))return; const d={...parsed.descriptor,skill:null}; return commitSource(replaceDescriptor(state.code.replace(/\s*<!-- HTML_IDE_REGION:tool-skill:start -->[\s\S]*?<!-- HTML_IDE_REGION:tool-skill:end -->/i,''),d)); }
-      commitSource(state.code.replace(TOOL_SKILL_RE,`<script id="tool-skill" type="text/markdown">${markdown.replace(/<\/script/gi,'<\\/script')}<\/script>`));
+      if(!markdown.trim()) { if(!confirm('Remove this Tool Skill?'))return; const d={...parsed.descriptor,skill:null}; return commitSource(replaceDescriptor(removeNamedRegion(state.code,'tool-skill'),d)); }
+      commitSource(replaceNamedRegion(state.code,'tool-skill',`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${markdown.replace(/<\/script/gi,'<\\/script')}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`));
     });
 
     // IDE setup tabs: the immutable IDE Coding Skill is copied only here.

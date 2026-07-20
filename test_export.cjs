@@ -25,4 +25,10 @@ check('placeholder resolution is scoped', api.compileAppSource(scoped,{fileName:
 const fakeBody='<html><body><script>const t=`</body>`;</script></body></html>';
 check('region insertion anchors after script template', api.replaceNamedRegion(fakeBody,'tool-descriptor',descriptor).indexOf('tool-descriptor')>fakeBody.indexOf('</script>'));
 check('inline script breakout escaping is active', api.escapeInlineScriptBreakouts('<script>const x="</script>";</script>').includes('<\\/script>'));
-if(failures)process.exit(1);
+// Compatibility ABI round-trip keeps registration tools descriptor-only and restores authored workflow source.
+const apiImport = new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, toolSkillBlocks, parseToolDescriptor};')({getElementById:id=>vault[id]||null});
+const importedRegistration = apiImport.unpackInlinedLibraries(registration);
+check('registration ABI import restores descriptor-only source', apiImport.parseToolDescriptor(importedRegistration).descriptor.skill === null && apiImport.toolSkillBlocks(importedRegistration).length === 0);
+const importedAuthored = apiImport.unpackInlinedLibraries(authoredCompiled);
+check('authored ABI import restores one Tool Skill', apiImport.toolSkillBlocks(importedAuthored).length === 1 && apiImport.parseToolDescriptor(importedAuthored).descriptor.skill.elementId === 'tool-skill');
+if (failures) process.exit(1);
