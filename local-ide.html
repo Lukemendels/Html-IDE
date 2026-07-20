@@ -627,7 +627,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
       <div id="ss-content-skill" class="hidden space-y-3 text-[11px] text-gray-300">
         <div class="space-y-1">
           <span class="block font-semibold text-white">Companion Skill Template</span>
-          <p class="text-gray-400 text-[10px] leading-relaxed">This markdown is embedded into every downloaded tool (when <strong>Embed StickShift</strong> is checked) and becomes that tool's companion skill. Edit it to teach your agent more than the basic HTML open call. Placeholders are filled per tool at download time: <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{TOOL_TITLE}}</code> <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{TOOL_FILE}}</code> <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{SKILL_SLUG}}</code></p>
+          <p class="text-gray-400 text-[10px] leading-relaxed">Used when a tool has no <code class="font-mono text-purple-400">tool-skill</code> block in its source. Tools that carry their own block override this template. Placeholders are filled per tool at download time: <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{TOOL_TITLE}}</code> <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{TOOL_FILE}}</code> <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">{{SKILL_SLUG}}</code></p>
         </div>
         <textarea id="ss-skill-template-input" spellcheck="false" class="w-full h-56 bg-[#0f0f11] border border-[#2a2a35] rounded-lg p-3 text-[10px] font-mono text-gray-300 focus:outline-none focus:border-purple-500/50 resize-y" placeholder="Companion skill markdown..."></textarea>
         <div class="flex items-center space-x-2">
@@ -671,6 +671,21 @@ The IDE contains preloaded offline library assets. You can inject them instantly
 
 ## Create Mode
 For a brand-new app, return exactly one complete HTML document and no Markdown fences or commentary. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
+
+## Companion Tool Skill
+Every exported tool may carry an editable companion skill in this source-resident block, placed just before `</body>`:
+```html
+<!-- HTML_IDE_REGION:tool-skill:start -->
+<script type="text/markdown" id="tool-skill">
+---
+name: {{SKILL_SLUG}}
+description: ...
+---
+...skill markdown...
+<\/script>
+<!-- HTML_IDE_REGION:tool-skill:end -->
+```
+In create mode, include it for StickShift tools. Include frontmatter, when to use the tool, its inputs/outputs, clipboard or packet contracts, and the standard open-instructions footer. `{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are substituted at export. In edit mode, patch its text normally or use `replace_region` on `tool-skill`; skill and code patches share the same hash and atomicity. Never write a literal closing-script token in it—write `<\/script` instead. This differs from `app-skill`, which is an app runtime LLM workflow; `tool-skill` is the StickShift companion installed as `skills/{{SKILL_SLUG}}.md`. Both may coexist.
 
 ## How the Agent Edits Code
 For edits to an existing app, generate a structured JSON `html-ide-patch` version `2.0` packet by default. The user will paste it into the AI Update Drawer. Include the exact current source hash supplied by the IDE/user as `target.sourceHash`, unique patch ids, explicit `expectedMatches`, and exact search text. Supported operations are `replace`, `insert_before`, `insert_after`, `delete`, and `replace_region` using `<!-- HTML_IDE_REGION:name:start -->` / `<!-- HTML_IDE_REGION:name:end -->` markers.
@@ -3709,7 +3724,11 @@ Prism.languages.js = Prism.languages.javascript;
     // Refresh Live Iframe Frame
     elements.refreshIframeBtn.addEventListener('click', () => {
       elements.refreshIcon.classList.add('animate-spin');
-      elements.previewFrame.srcdoc = state.code;
+      try {
+        elements.previewFrame.srcdoc = compileAppSource(state.code, { embedStickShift: false }).html;
+      } catch (err) {
+        elements.previewFrame.srcdoc = `<pre style="white-space:pre-wrap;color:#fca5a5;background:#111827;padding:1rem;font-family:monospace">${String(err.message || err).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre>`;
+      }
       setTimeout(() => {
         elements.refreshIcon.classList.remove('animate-spin');
       }, 600);
@@ -3758,6 +3777,24 @@ Prism.languages.js = Prism.languages.javascript;
       reader.readAsText(file);
     });
 
+    // Source-resident companion skill helpers. The block is inert markdown in
+    // the workspace and is transformed only in compiled exports.
+    const TOOL_SKILL_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-skill["'])[^>]*>([\s\S]*?)<\/script>/gi;
+    function isDataScriptOpenTag(openTag) {
+      return /type\s*=\s*["']?(?:text\/(?:plain|markdown)|application\/json)/i.test(openTag);
+    }
+    function toolSkillBlocks(html) { return [...html.matchAll(TOOL_SKILL_RE)]; }
+    function stripToolSkillRegionMarkers(html) {
+      return html.replace(/\s*<!-- HTML_IDE_REGION:tool-skill:(?:start|end) -->/gi, '');
+    }
+    function normalizeAuthoredToolSkill(html, toolFileName) {
+      const baseName = toolFileName.replace(/\.html?$/i, '');
+      const skillSlug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const toolTitle = baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return stripToolSkillRegionMarkers(html).replace(TOOL_SKILL_RE, (_, markdown) =>
+        `<script type="text/markdown" id="tool-skill" data-skill-slug="${skillSlug}">${substituteSkillPlaceholders(markdown, toolFileName, skillSlug, toolTitle).replace(/<\/script/gi, '<\\/script')}<\/script>`);
+    }
+
     // Unpack Inlined Libraries from code to stems
     function unpackInlinedLibraries(html) {
       let cleanedHtml = html;
@@ -3765,24 +3802,23 @@ Prism.languages.js = Prism.languages.javascript;
       // Strip injected PDF.js worker and setup script blocks to keep editor clean
       cleanedHtml = cleanedHtml.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>([\s\S]*?)<\/script>/gi, '');
       cleanedHtml = cleanedHtml.replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>([\s\S]*?)<\/script>/gi, '');
+      cleanedHtml = cleanedHtml.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi, (match, libId) => `<script id="${libId}-stem"><\/script>`);
+      cleanedHtml = cleanedHtml.replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi, (match, libId) => `<link rel="stylesheet" id="${libId}-stem">`);
 
-      // Replace injected library script blocks with their stems
-      cleanedHtml = cleanedHtml.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi, (match, libId) => {
-        return `<script id="${libId}-stem"><\/script>`;
-      });
-
-      // Replace injected library stylesheet blocks with their stems
-      cleanedHtml = cleanedHtml.replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi, (match, libId) => {
-        return `<link rel="stylesheet" id="${libId}-stem">`;
-      });
-
-      // Strip injected StickShift compliance blocks to keep editor clean
+      // Legacy exports had only an injected skill. Hoist its effective (already
+      // substituted) markdown into source so it is editable on re-import.
+      // Placeholders intentionally do not round-trip; the effective skill does.
+      const legacySkill = cleanedHtml.match(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<script\b(?=[^>]*\bid\s*=\s*["']stickshift-skill["'])[^>]*>([\s\S]*?)<\/script>[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/i);
+      if (legacySkill && toolSkillBlocks(cleanedHtml).length === 0) {
+        const canonical = `<!-- HTML_IDE_REGION:tool-skill:start -->\n<script type="text/markdown" id="tool-skill">${legacySkill[1]}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`;
+        cleanedHtml = cleanedHtml.replace(legacySkill[0], canonical);
+      } else {
+        cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/gi, '');
+      }
       cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_CSS_START -->[\s\S]*?<!-- STICKSHIFT_CSS_END -->/gi, '');
       cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_TRIGGER_START -->[\s\S]*?<!-- STICKSHIFT_TRIGGER_END -->/gi, '');
       cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_PANEL_START -->[\s\S]*?<!-- STICKSHIFT_PANEL_END -->/gi, '');
-      cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/gi, '');
       cleanedHtml = cleanedHtml.replace(/<!-- STICKSHIFT_JS_START -->[\s\S]*?<!-- STICKSHIFT_JS_END -->/gi, '');
-
       return cleanedHtml;
     }
 
@@ -3801,6 +3837,14 @@ Prism.languages.js = Prism.languages.javascript;
       while ((openMatch = openRe.exec(html)) !== null) {
         output += html.slice(cursor, openMatch.index) + openMatch[0];
         let i = openRe.lastIndex;
+        if (isDataScriptOpenTag(openMatch[0])) {
+          const closeEnd = html.toLowerCase().indexOf('<\/script>', i);
+          if (closeEnd === -1) { cursor = i; break; }
+          output += html.slice(i, closeEnd + 9);
+          cursor = closeEnd + 9;
+          openRe.lastIndex = cursor;
+          continue;
+        }
         let mode = null;
         for (; i < html.length; i++) {
           const c = html[i];
@@ -3842,24 +3886,29 @@ Prism.languages.js = Prism.languages.javascript;
     }
 
     function validateCompiledAppHtml(html) {
+      const authoredSkills = toolSkillBlocks(html);
+      if (authoredSkills.length > 1) return { ok: false, errors: ['Multiple tool-skill blocks found; a tool may carry exactly one companion skill.'] };
+      for (const match of [...authoredSkills, ...html.matchAll(/<script\b(?=[^>]*\bid\s*=\s*["']stickshift-skill["'])[^>]*>([\s\S]*?)<\/script>/gi)]) {
+        if (/<\/script/i.test(match[1])) return { ok: false, errors: ['A companion skill contains an unescaped closing-script token.'] };
+      }
+      if (authoredSkills.length && html.includes('STICKSHIFT_TOOL')) {
+        if (!/id="tool-skill" data-skill-slug="[^"]+"/.test(html) || html.includes('STICKSHIFT_SKILL_START') || !html.includes("getElementById('tool-skill')")) return { ok: false, errors: ['Authored companion skill export is incomplete.'] };
+      }
       const unresolvedStem = html.match(/<(?:script|link)\b[^>]*id=["']lib-[^"']+-stem["'][^>]*>/i);
-      if (unresolvedStem) {
-        return { ok: false, errors: ['Unresolved library stem remains: ' + unresolvedStem[0].slice(0, 120)] };
+      if (unresolvedStem) return { ok: false, errors: ['Unresolved library stem remains: ' + unresolvedStem[0].slice(0, 120)] };
+      const pdfMain = [...html.matchAll(/<script\b[^>]*id=["']injected-lib-pdfjs["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      const pdfWorker = [...html.matchAll(/<script\b[^>]*id=["']injected-lib-pdfjs-worker["'][^>]*type=["']text\/plain["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      const pdfSetup = [...html.matchAll(/<script\b[^>]*id=["']injected-lib-pdfjs-setup["'][^>]*>([\s\S]*?)<\/script>/gi)];
+      if (pdfMain.length || pdfWorker.length || pdfSetup.length) {
+        if (pdfMain.length !== 1 || pdfWorker.length !== 1 || pdfSetup.length !== 1 || !pdfMain[0][1].trim() || !pdfWorker[0][1].trim()) return { ok: false, errors: ['PDF.js must include exactly one main library, non-executing worker payload, and setup script.'] };
+        if (!(pdfMain[0].index < pdfWorker[0].index && pdfWorker[0].index < pdfSetup[0].index)) return { ok: false, errors: ['PDF.js main library, worker payload, and setup script are out of order.'] };
+        const setup = pdfSetup[0][1];
+        if (!setup.includes("getElementById('injected-lib-pdfjs-worker').textContent") || !setup.includes('new Blob') || !setup.includes('URL.createObjectURL') || !setup.includes('GlobalWorkerOptions.workerSrc')) return { ok: false, errors: ['PDF.js worker setup must derive a Blob URL from the embedded worker payload.'] };
+        if (/workerSrc\s*=\s*["'](?:https?:|\.?\/|[^"']+\.js)/i.test(setup)) return { ok: false, errors: ['PDF.js worker setup references an external or relative worker resource.'] };
       }
-      if (/<script\b[^>]*id=["']injected-lib-pdfjs["'][^>]*>/i.test(html) && !/<script\b[^>]*id=["']injected-lib-pdfjs-worker["'][^>]*type=["']text\/plain["'][^>]*>/i.test(html)) {
-        return { ok: false, errors: ['PDF.js was injected without its inlined worker payload.'] };
-      }
-      const duplicateIds = [];
-      const seen = new Set();
-      html.replace(/id=["'](injected-lib-[^"']+)["']/gi, (_, id) => {
-        if (seen.has(id)) duplicateIds.push(id);
-        seen.add(id);
-        return _;
-      });
-      if (duplicateIds.length) {
-        return { ok: false, errors: ['Duplicate injected library id(s): ' + duplicateIds.join(', ')] };
-      }
-      return { ok: true, errors: [] };
+      const duplicateIds = [], seen = new Set();
+      html.replace(/id=["'](injected-lib-[^"']+)["']/gi, (_, id) => { if (seen.has(id)) duplicateIds.push(id); seen.add(id); return _; });
+      return duplicateIds.length ? { ok: false, errors: ['Duplicate injected library id(s): ' + duplicateIds.join(', ')] } : { ok: true, errors: [] };
     }
 
     // Pack Libraries: replaces stems with full inlined library content
@@ -3887,11 +3936,14 @@ Prism.languages.js = Prism.languages.javascript;
               return `<script id="injected-${libId}">\n${escapeScriptTextForHtml(content)}\n<\/script>\n` +
                      `<script id="injected-${libId}-worker" type="text/plain">\n${escapeScriptTextForHtml(workerContent)}\n<\/script>\n` +
                      `<script id="injected-${libId}-setup">\n` +
-                     `if (typeof window !== 'undefined' && window.pdfjsLib) {\n` +
+                     `(function(){\n` +
+                     `  if (typeof window === 'undefined' || !window.pdfjsLib) return;\n` +
+                     `  if (window.__htmlIdePdfjsWorkerUrl) URL.revokeObjectURL(window.__htmlIdePdfjsWorkerUrl);\n` +
                      `  const workerContent = document.getElementById('injected-${libId}-worker').textContent;\n` +
-                     `  const blob = new Blob([workerContent], { type: 'text/javascript' });\n` +
-                     `  window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);\n` +
-                     `}\n` +
+                     `  const workerBlob = new Blob([workerContent], { type: 'text/javascript' });\n` +
+                     `  window.__htmlIdePdfjsWorkerUrl = URL.createObjectURL(workerBlob);\n` +
+                     `  window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.__htmlIdePdfjsWorkerUrl;\n` +
+                     `})();\n` +
                      `<\/script>`;
             });
           } else {
@@ -3905,9 +3957,11 @@ Prism.languages.js = Prism.languages.javascript;
     }
 
     function compileAppSource(editableSource, options = {}) {
+      if (toolSkillBlocks(editableSource).length > 1) throw new Error('Compiled app validation failed:\nMultiple tool-skill blocks found; a tool may carry exactly one companion skill.');
       let compiled = packLibraries(escapeInlineScriptBreakouts(editableSource));
       const fileName = options.fileName || state.currentFileName.replace(/\.html$/, '') + '-compiled.html';
       if (options.embedStickShift) compiled = injectStickShiftCompliance(compiled, fileName);
+      else if (toolSkillBlocks(compiled).length) compiled = normalizeAuthoredToolSkill(compiled, fileName);
       const validation = validateCompiledAppHtml(compiled);
       if (!validation.ok) throw new Error('Compiled app validation failed:\n' + validation.errors.join('\n'));
       return { html: compiled, fileName, validation };
@@ -4044,17 +4098,13 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."`;
 
     // Resolve the active skill template (custom override or built-in
     // default) and substitute the per-tool placeholders.
+    function substituteSkillPlaceholders(markdown, toolFileName, skillSlug, toolTitle) {
+      return markdown.replace(/\{\{TOOL_TITLE\}\}/g, toolTitle).replace(/\{\{TOOL_FILE\}\}/g, toolFileName).replace(/\{\{SKILL_SLUG\}\}/g, skillSlug);
+    }
     function renderSkillMarkdown(toolFileName, skillSlug, toolTitle) {
       const custom = ssGetSetting(SS_KEYS.skillTemplate);
       const template = (custom && custom.trim()) ? custom : DEFAULT_SKILL_TEMPLATE;
-      return template
-        .replace(/\{\{TOOL_TITLE\}\}/g, toolTitle)
-        .replace(/\{\{TOOL_FILE\}\}/g, toolFileName)
-        .replace(/\{\{SKILL_SLUG\}\}/g, skillSlug)
-        // A raw closing script tag inside the skill text would terminate the
-        // embedding markdown data block early and dump the remainder of the
-        // exported file into the page as text. Escape it defensively.
-        .replace(/<\/script/gi, '<\\/script');
+      return substituteSkillPlaceholders(template, toolFileName, skillSlug, toolTitle).replace(/<\/script/gi, '<\\/script');
     }
 
     // Detect literal closing-script sequences hiding inside JS strings or
@@ -4076,7 +4126,7 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."`;
 
         // Skip non-executing data blocks and the packed library vault
         // (known-good upstream dists that may confuse the string scanner)
-        const isDataBlock = /type\s*=\s*["']?(?:text\/(?:plain|markdown)|application\/json)/i.test(openTag);
+        const isDataBlock = isDataScriptOpenTag(openTag);
         const isPackedLib = /id\s*=\s*["'](?:injected-)?lib-/i.test(openTag);
 
         if (!isDataBlock && !isPackedLib) {
@@ -4114,11 +4164,14 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."`;
 
     function injectStickShiftCompliance(html, toolFileName) {
       // Already compliant — don't double-inject
-      if (html.includes('stickshift-skill') || html.includes('STICKSHIFT_TOOL')) return html;
+      if (html.includes('STICKSHIFT_TOOL')) return html;
 
       const baseName = toolFileName.replace(/\.html?$/i, '');
       const skillSlug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const toolTitle = baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const hasAuthoredSkill = toolSkillBlocks(html).length === 1;
+      if (hasAuthoredSkill) html = normalizeAuthoredToolSkill(html, toolFileName);
+      const skillElementId = hasAuthoredSkill ? 'tool-skill' : 'stickshift-skill';
 
       // --- CSS ---
       const ssCSS = `
@@ -4169,7 +4222,7 @@ Instruction: "Copy the block above and click Open HTML Tool in StickShift."`;
       <div style="font-size:.6875rem;color:#d1d5db;line-height:1.6">
         <div style="font-weight:600;color:#fff;margin-bottom:.25rem">Step 1 — Install the Companion Skill</div>
         <p style="color:#9ca3af;font-size:.625rem;margin:0 0 .75rem">Copy the skill markdown below and save it as <code style="color:#c084fc;background:rgba(192,132,252,.1);padding:0 .25rem;border-radius:.25rem">skills/${skillSlug}.md</code> in your StickShift directory.</p>
-        <button id="ss-copy-skill" onclick="(function(){var t=document.getElementById('stickshift-skill').innerHTML;var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);var b=document.getElementById('ss-copy-skill');b.textContent='Copied!';setTimeout(function(){b.textContent='Copy Companion Skill Markdown'},2000)})()" style="width:100%;background:#7c3aed;border:none;color:#fff;font-size:.6875rem;font-weight:600;padding:.5rem;border-radius:.5rem;cursor:pointer;margin-bottom:1rem">Copy Companion Skill Markdown</button>
+        <button id="ss-copy-skill" onclick="(function(){var t=document.getElementById('${skillElementId}').innerHTML;var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');document.body.removeChild(ta);var b=document.getElementById('ss-copy-skill');b.textContent='Copied!';setTimeout(function(){b.textContent='Copy Companion Skill Markdown'},2000)})()" style="width:100%;background:#7c3aed;border:none;color:#fff;font-size:.6875rem;font-weight:600;padding:.5rem;border-radius:.5rem;cursor:pointer;margin-bottom:1rem">Copy Companion Skill Markdown</button>
         <div style="font-weight:600;color:#fff;margin-bottom:.25rem">Step 2 — Open via Cockpit</div>
         <p style="color:#9ca3af;font-size:.625rem;margin:0">Your LLM agent can now open this tool directly from the StickShift cockpit using the companion skill.</p>
       </div>
@@ -4213,7 +4266,7 @@ ${renderSkillMarkdown(toolFileName, skillSlug, toolTitle)}
       // tool's own script (common in tools that build HTML documents). The
       // payload's real closing script tags then terminated the host script
       // early, and the rest of the tool's JS rendered as page text.
-      const ssPayload = ssCSS + '\n' + ssTrigger + '\n' + ssPanel + '\n' + ssSkill + '\n' + ssJS + '\n';
+      const ssPayload = ssCSS + '\n' + ssTrigger + '\n' + ssPanel + '\n' + (hasAuthoredSkill ? '' : ssSkill + '\n') + ssJS + '\n';
       const lowerHtml = html.toLowerCase();
       let anchor = lowerHtml.lastIndexOf('<\/body>');
       if (anchor === -1) { anchor = lowerHtml.lastIndexOf('<\/html>'); }

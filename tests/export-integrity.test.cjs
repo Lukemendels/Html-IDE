@@ -25,7 +25,7 @@ function extractFunction(name) {
   }
   throw new Error(`Could not extract ${name}`);
 }
-const helpers = new Function(`${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)();
+const helpers = new Function(`${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)();
 
 const adversarialJs = 'const a = "</script>"; const b = "</ScRiPt>"; const c = `<div></script></div>`; const d = JSON.stringify({ html: "</script>" });';
 const escapedJs = helpers.escapeScriptTextForHtml(adversarialJs);
@@ -70,3 +70,12 @@ for (const id of Object.keys(libPaths).filter(id => id !== 'lib-pdfjs-worker')) 
 }
 
 console.log('export integrity tests passed');
+
+const buildScript = fs.readFileSync(path.join(root, 'build_local_ide.py'), 'utf8');
+assert(buildScript.includes('"lib_pdfjs"') && buildScript.includes('"lib_pdfjs_worker"'), 'build config includes both mandatory PDF.js inputs');
+assert(buildScript.includes('MANDATORY_LIB_TOKENS') && buildScript.includes('Required PDF.js build input'), 'build fails clearly for missing or empty PDF.js inputs');
+const workerSource = fs.readFileSync(path.join(root, 'node_modules/pdfjs-dist/build/pdf.worker.min.js'), 'utf8');
+const workerVaultMatch = built.match(/<script type="text\/plain" id="lib-pdfjs-worker">([\s\S]*?)<\/script>/i);
+assert(workerVaultMatch && workerVaultMatch[1].includes(workerSource.slice(0, 1024)), 'standalone IDE vault physically contains PDF.js worker source');
+assert(built.includes('window.__htmlIdePdfjsWorkerUrl') && built.includes('URL.revokeObjectURL(window.__htmlIdePdfjsWorkerUrl)'), 'PDF.js setup manages obsolete Blob URLs');
+console.log('PDF.js vault integration checks passed');

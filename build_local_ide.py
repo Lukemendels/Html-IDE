@@ -82,14 +82,25 @@ def get_tailwind_js():
         print(f"Error fetching Tailwind JS: {e}")
         raise
 
+MANDATORY_LIB_TOKENS = {"lib_pdfjs", "lib_pdfjs_worker"}
+
 def load_lib(token, path):
-    if os.path.exists(path):
-        print(f"  Loading {token}: {os.path.basename(path)} ({os.path.getsize(path) // 1024}KB)")
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
-    else:
+    if not os.path.isfile(path):
+        if token in MANDATORY_LIB_TOKENS:
+            raise RuntimeError(f"Required PDF.js build input is missing: {path}. Run npm install.")
         print(f"  WARNING: {token} not found at {path} — embedding empty stub")
         return f"/* {token} not bundled — run npm install */\nconsole.warn('{token} not loaded');"
+    if os.path.getsize(path) == 0:
+        if token in MANDATORY_LIB_TOKENS:
+            raise RuntimeError(f"Required PDF.js build input is empty: {path}.")
+        print(f"  WARNING: {token} is empty at {path} — embedding empty stub")
+        return f"/* {token} not bundled — run npm install */\nconsole.warn('{token} not loaded');"
+    print(f"  Loading {token}: {os.path.basename(path)} ({os.path.getsize(path) // 1024}KB)")
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+    if token in MANDATORY_LIB_TOKENS and not content.strip():
+        raise RuntimeError(f"Required PDF.js build input contains no source: {path}.")
+    return content
 
 def escape_script_data_block(content):
     """Keep library text safe inside HTML <script> data blocks."""
