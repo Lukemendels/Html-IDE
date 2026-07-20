@@ -2,7 +2,7 @@ const fs=require('fs'), src=fs.readFileSync('local-ide.src.html','utf8');
 const a=src.indexOf('    // Source-resident Tool Descriptor'), b=src.indexOf('    // Sync Library Indicators',a);
 const store={}; global.localStorage={getItem:k=>store[k]||null,setItem:(k,v)=>store[k]=String(v),removeItem:k=>delete store[k]};
 const vault={'lib-pdfjs':{textContent:'main'},'lib-pdfjs-worker':{textContent:'worker'}};
-const api=new Function('document',src.slice(a,b)+';return {parseToolDescriptor,validateToolIntegration,compileAppSource,injectStickShiftCompliance,unpackInlinedLibraries,toolSkillBlocks};')({getElementById:id=>vault[id]||null});
+const api=new Function('document',src.slice(a,b)+';return {parseToolDescriptor,validateToolIntegration,compileAppSource,injectStickShiftCompliance,unpackInlinedLibraries,toolSkillBlocks,packLibraries};')({getElementById:id=>vault[id]||null});
 let fail=0; const ok=(n,v)=>{console.log((v?'PASS ':'FAIL ')+n);if(!v)fail++};
 const descriptor=`<!-- HTML_IDE_REGION:tool-descriptor:start --><script id="tool-descriptor" type="application/json">{"schema":"stickshift-tool","version":"1.0","file":"{{TOOL_FILE}}","title":"{{TOOL_TITLE}}","description":"demo","open":{"protocol":"HTML_OPEN","tool":"{{TOOL_FILE}}"},"skill":null}</script><!-- HTML_IDE_REGION:tool-descriptor:end -->`;
 const plain='<html><body>plain</body></html>'; ok('standalone compiles',api.compileAppSource(plain,{fileName:'plain.html'}).html.includes('plain'));
@@ -13,4 +13,11 @@ const compiled=api.compileAppSource('<html><body>'+withSkill+'</body></html>',{f
 ok('contradictory descriptor fails',!api.validateToolIntegration('<html><body>'+descriptor+withSkill.match(/<!-- HTML_IDE_REGION:tool-skill[\s\S]*/)[0]+'</body></html>',false).ok);
 const legacy='<html><body><!-- STICKSHIFT_SKILL_START --><script id="stickshift-skill" type="text/markdown">specific instructions</script><!-- STICKSHIFT_SKILL_END --></body></html>'; ok('legacy authored skill hoisted',api.unpackInlinedLibraries(legacy).includes('id="tool-skill"'));
 ok('IDE coding skill named once', (src.match(/id="ide-coding-skill"/g)||[]).length===1 && !src.includes('ss-skill-template-input'));
+
+const quotedStem = '<html><body><script id="tool-descriptor" type="application/json">{"example":"<script id=\\"lib-jszip-stem\\"></script>"}</script><script id="lib-jszip-stem"></script></body></html>';
+const masked = api.packLibraries ? api.packLibraries(quotedStem) : '';
+ok('data-script masking preserves quoted library stems', !masked.includes('injected-lib-jszip') || masked.indexOf('injected-lib-jszip') === masked.lastIndexOf('injected-lib-jszip'));
+const placeholderApp = '<html><body><p>{{TOOL_FILE}} {{TOOL_TITLE}} {{SKILL_SLUG}}</p>' + descriptor + '</body></html>';
+const placeholderCompiled = api.compileAppSource(placeholderApp, { fileName: 'scoped.html' }).html;
+ok('application placeholders remain outside integration blocks', placeholderCompiled.includes('<p>{{TOOL_FILE}} {{TOOL_TITLE}} {{SKILL_SLUG}}</p>'));
 if(fail)process.exit(1);

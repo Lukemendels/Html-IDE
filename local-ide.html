@@ -3260,7 +3260,10 @@ Prism.languages.js = Prism.languages.javascript;
     return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
   }
 
+  function stripCodeFences(text) { const trimmed=String(text || '').trim(); const match=trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```$/i); return match ? match[1] : String(text || ''); }
+
   function parsePatchPacket(packetText) {
+    packetText = stripCodeFences(packetText);
     const trimmed = String(packetText || '').trim();
     if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
     let parsed;
@@ -3771,8 +3774,8 @@ Prism.languages.js = Prism.languages.javascript;
     const TOOL_SKILL_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-skill["'])[^>]*>([\s\S]*?)<\/script>/gi;
     const TOOL_DESCRIPTOR_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-descriptor["'])[^>]*>([\s\S]*?)<\/script>/gi;
     function isDataScriptOpenTag(openTag) { return /type\s*=\s*["']?(?:text\/(?:plain|markdown)|application\/json)/i.test(openTag); }
-    function toolSkillBlocks(html) { return [...html.matchAll(TOOL_SKILL_RE)]; }
-    function toolDescriptorBlocks(html) { return [...html.matchAll(TOOL_DESCRIPTOR_RE)]; }
+    function toolSkillBlocks(html) { TOOL_SKILL_RE.lastIndex=0; return [...html.matchAll(TOOL_SKILL_RE)]; }
+    function toolDescriptorBlocks(html) { TOOL_DESCRIPTOR_RE.lastIndex=0; return [...html.matchAll(TOOL_DESCRIPTOR_RE)]; }
     function toolIdentity(fileName) {
       const baseName = String(fileName || 'tool.html').replace(/\.html?$/i, '');
       return { file: baseName + '.html', slug: baseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'tool', title: baseName.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Tool' };
@@ -3802,17 +3805,13 @@ Prism.languages.js = Prism.languages.javascript;
         if (descriptorResult.descriptor.skill === null && skills.length) errors.push('Tool Descriptor declares skill: null but a Tool Skill exists. Update the descriptor or remove the Tool Skill.');
         if (descriptorResult.descriptor.skill !== null && skills.length !== 1) errors.push('Tool Descriptor references a Tool Skill but exactly one tool-skill block is required.');
       } else if (skills.length) errors.push('A Tool Skill requires a Tool Descriptor that references it.');
-      if (compiled && /\{\{(?:TOOL_FILE|TOOL_TITLE|SKILL_SLUG)\}\}/.test(html)) errors.push('Compiled integration output contains unresolved placeholders.');
+      if (compiled && [...toolDescriptorBlocks(html), ...toolSkillBlocks(html)].some(m => /\{\{(?:TOOL_FILE|TOOL_TITLE|SKILL_SLUG)\}\}/.test(m[1]))) errors.push('Compiled integration output contains unresolved placeholders.');
       return {ok:!errors.length, errors, descriptor:descriptorResult.descriptor || null, hasSkill:skills.length === 1};
     }
-    function replaceDescriptor(html, descriptor) {
-      const block='<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">\n'+JSON.stringify(descriptor,null,2)+'\n<\\/script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->';
-      if (toolDescriptorBlocks(html).length) return html.replace(TOOL_DESCRIPTOR_RE, block.replace(/<\\\//g,'</'));
-      return html.replace(/<\/body>/i, '\n'+block.replace(/<\\\//g,'</')+'\n</body>');
-    }
-    function substituteIntegrationPlaceholders(html, fileName) {
-      const i=toolIdentity(fileName); return html.replace(/\{\{TOOL_FILE\}\}/g,i.file).replace(/\{\{TOOL_TITLE\}\}/g,i.title).replace(/\{\{SKILL_SLUG\}\}/g,i.slug).replace(/<\\\/script/gi,'<\\/script');
-    }
+    function replaceDescriptor(html, descriptor) { const block='<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">\n'+JSON.stringify(descriptor,null,2)+'\n<\/script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->'; return replaceNamedRegion(html,'tool-descriptor',block.replace(/<\\\//g,'</')); }
+
+    function resolveBlockPlaceholders(html, re, identity) { return html.replace(re, block => block.replace(/\{\{TOOL_FILE\}\}/g,identity.file).replace(/\{\{TOOL_TITLE\}\}/g,identity.title).replace(/\{\{SKILL_SLUG\}\}/g,identity.slug)); }
+    function substituteIntegrationPlaceholders(html, fileName) { const identity=toolIdentity(fileName); html=resolveBlockPlaceholders(html, TOOL_DESCRIPTOR_RE, identity); return resolveBlockPlaceholders(html, TOOL_SKILL_RE, identity); }
     function normalizeAuthoredToolSkill(html, fileName) { return substituteIntegrationPlaceholders(html, fileName); }
     function unpackInlinedLibraries(html) {
       let cleaned=html.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>[\s\S]*?<\/script>/gi,'');
@@ -3825,17 +3824,45 @@ Prism.languages.js = Prism.languages.javascript;
       return cleaned.replace(/<!-- STICKSHIFT_(?:CSS|TRIGGER|PANEL|JS)_START -->[\s\S]*?<!-- STICKSHIFT_(?:CSS|TRIGGER|PANEL|JS)_END -->/gi,'');
     }
     function escapeScriptTextForHtml(t) { return String(t||'').replace(/<\/script/gi,'<\\/script'); }
-    function escapeInlineScriptBreakouts(html) { return html; }
-    function detectScriptBreakouts(html) { return []; }
+    function maskDataScriptBlocks(html) {
+      const blocks = []; const nonce = '__HTML_IDE_DATA_' + Math.random().toString(36).slice(2) + '_';
+      const masked = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, block => {
+        const open = block.match(/^<script\b[^>]*>/i)[0];
+        if (!isDataScriptOpenTag(open)) return block;
+        const token = nonce + blocks.length + '__'; blocks.push(block); return token;
+      });
+      return { html: masked, restore: value => value.replace(new RegExp(nonce + '(\\d+)__', 'g'), (_, i) => blocks[Number(i)]) };
+    }
+    function escapeNamedDataRegionBreakouts(html) {
+      for (const name of ['tool-descriptor', 'tool-skill']) {
+        const region = findNamedRegion(html, name); if (!region) continue;
+        html = html.slice(0, region.start) + region.text.replace(/<\\\/script/gi, '<\\/script').replace(/<\/script/gi, '<\\/script') + html.slice(region.end);
+      } return html;
+    }
+    function escapeInlineScriptBreakouts(html) {
+      let output='', cursor=0, openRe=/<script\b[^>]*>/gi, m;
+      while ((m=openRe.exec(html))) { output+=html.slice(cursor,m.index)+m[0]; let i=openRe.lastIndex;
+        if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf('</script>',i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
+        let mode=null; for(;i<html.length;i++){const c=html[i],n=html[i+1], close=html.slice(i,i+8).toLowerCase()==='</script'; if(close&&mode===null)break; if(close){output+='<\\/script';i+=7;continue;} output+=c; if(!mode){if(c==='"'||c==="'"||c==='`')mode=c;else if(c==='/'&&n==='/'){mode='L';output+=n;i++;}else if(c==='/'&&n==='*'){mode='B';output+=n;i++;}}else if(mode==='L'&&c==='\n')mode=null;else if(mode==='B'&&c==='*'&&n==='/'){output+=n;i++;mode=null;}else if(c==='\\') {output+=n||'';i++;} else if(c===mode)mode=null;}
+        const closeEnd=html.indexOf('>',i); if(i<html.length&&closeEnd>=0){output+=html.slice(i,closeEnd+1);cursor=closeEnd+1;openRe.lastIndex=cursor;}else{cursor=i;break;}
+      } return output+html.slice(cursor);
+    }
+    function detectScriptBreakouts(html) { const escaped=escapeInlineScriptBreakouts(html); return escaped===html?[]:[{line:1,snippet:'literal closing-script token escaped in executable script'}]; }
+    function findNamedRegion(html,name) { const re=new RegExp('<!-- HTML_IDE_REGION:'+name+':(start|end) -->','gi'); const marks=[...html.matchAll(re)]; if(!marks.length)return null; if(marks.length!==2||marks[0][1].toLowerCase()!=='start'||marks[1][1].toLowerCase()!=='end')throw new Error('Malformed '+name+' named region: require one start marker followed by one end marker.'); return {start:marks[0].index,end:marks[1].index+marks[1][0].length,text:html.slice(marks[0].index,marks[1].index+marks[1][0].length)}; }
+    function documentEndIndex(html) { const lower=html.toLowerCase(); const body=lower.lastIndexOf('</body>'); return body>=0?body:(lower.lastIndexOf('</html>')>=0?lower.lastIndexOf('</html>'):html.length); }
+    function insertNamedRegionBeforeDocumentEnd(html,name,replacement) { if(findNamedRegion(html,name))throw new Error(name+' region already exists.'); const at=documentEndIndex(html); return html.slice(0,at)+'\n'+replacement+'\n'+html.slice(at); }
+    function replaceNamedRegion(html,name,replacement) { const r=findNamedRegion(html,name); return r?html.slice(0,r.start)+replacement+html.slice(r.end):insertNamedRegionBeforeDocumentEnd(html,name,replacement); }
+    function removeNamedRegion(html,name) { const r=findNamedRegion(html,name); return r?html.slice(0,r.start)+html.slice(r.end):html; }
     function packLibraries(html) {
-      let packedHtml=html; ['lib-alpine','lib-picocss','lib-jszip','lib-docxtemplater','lib-docx','lib-mammoth','lib-sheetjs','lib-pptxgen','lib-pdfjs'].forEach(libId=>{const c=document.getElementById(libId); if(!c)return; const text=c.textContent; if(libId==='lib-picocss') packedHtml=packedHtml.replace(new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`,'gi'),`<style id="injected-${libId}">${text}</style>`); else if(libId==='lib-pdfjs'){const w=document.getElementById('lib-pdfjs-worker'); packedHtml=packedHtml.replace(new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi'),`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script><script id="injected-${libId}-worker" type="text/plain">${escapeScriptTextForHtml(w?w.textContent:'')}<\/script><script id="injected-${libId}-setup">(function(){var x=document.getElementById('injected-lib-pdfjs-worker').textContent;var u=URL.createObjectURL(new Blob([x],{type:'text/javascript'}));window.pdfjsLib.GlobalWorkerOptions.workerSrc=u})()<\/script>`)} else packedHtml=packedHtml.replace(new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi'),`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script>`)}); return packedHtml;
+      const dataMask = maskDataScriptBlocks(html);
+      let packedHtml=dataMask.html; ['lib-alpine','lib-picocss','lib-jszip','lib-docxtemplater','lib-docx','lib-mammoth','lib-sheetjs','lib-pptxgen','lib-pdfjs'].forEach(libId=>{const c=document.getElementById(libId); if(!c)return; const text=c.textContent; if(libId==='lib-picocss') packedHtml=packedHtml.replace(new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`,'gi'),`<style id="injected-${libId}">${text}</style>`); else if(libId==='lib-pdfjs'){const w=document.getElementById('lib-pdfjs-worker'); packedHtml=packedHtml.replace(new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi'),`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script><script id="injected-${libId}-worker" type="text/plain">${escapeScriptTextForHtml(w?w.textContent:'')}<\/script><script id="injected-${libId}-setup">(function(){if(typeof window==='undefined'||!window.pdfjsLib)return;if(window.__htmlIdePdfjsWorkerUrl)URL.revokeObjectURL(window.__htmlIdePdfjsWorkerUrl);var x=document.getElementById('injected-lib-pdfjs-worker').textContent;var u=URL.createObjectURL(new Blob([x],{type:'text/javascript'}));window.__htmlIdePdfjsWorkerUrl=u;window.pdfjsLib.GlobalWorkerOptions.workerSrc=u})()<\/script>`)} else packedHtml=packedHtml.replace(new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi'),`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script>`)}); return dataMask.restore(packedHtml);
     }
     function injectStickShiftCompliance(html,fileName) {
-      if(html.includes('STICKSHIFT_TOOL_SETUP'))return html; const check=validateToolIntegration(html,false); if(!check.ok)throw new Error(check.errors.join('\n')); if(!check.descriptor)throw new Error('Tool Setup UI requires a Tool Descriptor. Add Tool Integration before exporting.');
+      if(html.includes('STICKSHIFT_TOOL_SETUP'))return html; const check=validateToolIntegration(html,false); if(!check.ok)throw new Error(check.errors.join('\n')); if(!check.descriptor)return html;
       const d=check.descriptor,i=toolIdentity(fileName), skill=check.hasSkill, open=`<HTML_OPEN>\ntool: ${d.open.tool}\n${skill?`include:\n- skills/${d.skill.slug}.md\n`:''}</HTML_OPEN>`;
       const copy=skill?`<button id="ss-copy-skill" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('tool-skill').textContent)">Copy Tool Skill</button>`:'<p>No Tool Skill is required for this tool.</p>';
       const payload=`<!-- STICKSHIFT_TOOL_SETUP --><button id="ss-trigger" onclick="document.getElementById('ss-panel').hidden=false">Tool Setup</button><div id="ss-panel" hidden><pre>${open}</pre>${copy}</div><script>var STICKSHIFT_TOOL=${JSON.stringify({file:d.file,title:d.title,skill:skill})};<\/script>`;
-      const at=html.toLowerCase().lastIndexOf('</body>'); return at<0?html+payload:html.slice(0,at)+payload+html.slice(at);
+      const at=documentEndIndex(html); return html.slice(0,at)+payload+html.slice(at);
     }
     function validateCompiledAppHtml(html) { const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html))return {ok:false,errors:['No fallback stickshift-skill may be injected.']}; const stem=html.match(/<(?:script|link)\b[^>]*id=["']lib-[^"']+-stem["'][^>]*>/i); return stem?{ok:false,errors:['Unresolved library stem remains.']}:{ok:true,errors:[]}; }
     function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; let html=packLibraries(escapeInlineScriptBreakouts(editableSource)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const v=validateCompiledAppHtml(html); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }

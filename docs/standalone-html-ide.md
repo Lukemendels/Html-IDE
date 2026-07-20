@@ -29,3 +29,9 @@ On startup the IDE detects the obsolete `htmlide-ss-skill-template` browser valu
 ## Offline operation
 
 Preview and download share `compileAppSource()`. Offline library stems are expanded only in preview/download output, including the self-contained PDF.js worker Blob setup. The application remains single-file and does not require a server or network connection.
+
+## Integrity safeguards and verification
+
+Library packing masks non-executing `text/plain`, `text/markdown`, and `application/json` script blocks before scanning stems, then restores the bytes after packing. This prevents examples in a Tool Descriptor, Tool Skill, App Runtime Contract, or documentation payload from becoming libraries. Executable script payloads escape literal closing-script sequences at the embedding boundary. PDF.js exports include an embedded non-executing worker and Blob URL setup; no worker network path is used.
+
+Patch packets are source-hash-bound and exact-match atomic transactions. The parser accepts one complete fenced JSON payload as well as unfenced JSON and legacy SEARCH/REPLACE input. Named regions are validated before descriptor/skill mutation. Run `npm install`, `python3 build_local_ide.py`, `node tests/patch-engine.test.cjs`, `node test_export.cjs`, `node tests/export-integrity.test.cjs`, and `npm run lint` before release. Browser smoke checks should exercise file:// standalone Pomodoro download, descriptor-only setup, skill-enabled setup, script template insertion, PDF.js worker export, and legacy import round trips.
