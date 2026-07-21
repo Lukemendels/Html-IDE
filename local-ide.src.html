@@ -388,7 +388,7 @@
             </div>
             <div class="text-left">
               <span class="text-xs font-semibold text-gray-200">Paste AI Update Packet</span>
-              <p class="text-[9px] text-gray-500 font-mono">Apply structured html-ide-patch v2 packets; legacy SEARCH/REPLACE remains supported</p>
+              <p class="text-[9px] text-gray-500 font-mono">Apply JSON-only html-ide-patch v2 packets</p>
             </div>
           </div>
           <div class="flex items-center space-x-3">
@@ -400,10 +400,10 @@
         <!-- Drawer Content (Collapsible) -->
         <div id="aiDrawerContent" class="px-5 pb-5 space-y-3.5 overflow-hidden transition-all duration-300">
           <div class="relative">
-            <textarea id="aiPacketInput" placeholder="SEARCH:&#10;<div class=&quot;old-code&quot;>...</div>&#10;&#10;REPLACE:&#10;<div class=&quot;new-code&quot;>...</div>" class="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"></textarea>
+            <textarea id="aiPacketInput" placeholder="{&#10;  &quot;protocol&quot;: &quot;html-ide-patch&quot;,&#10;  &quot;version&quot;: &quot;2.0&quot;,&#10;  ...&#10;}" class="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"></textarea>
 
             <div class="absolute right-3.5 bottom-3 text-[10px] text-gray-600 font-mono select-none">
-              Supports multiple blocks
+              JSON or a single fenced JSON packet
             </div>
           </div>
 
@@ -621,7 +621,7 @@ For edits to an existing app, generate a structured JSON `html-ide-patch` versio
 2. **No Ambiguity**: If a search block appears more than once, add stable surrounding context or use a named region; do not rely on first occurrence.
 3. **Atomicity**: All patches must be valid together. One bad patch rejects the whole packet.
 4. **Library Safety**: Insert Stem Tags for libraries; never paste full bundled library payloads.
-5. **Legacy**: SEARCH:/REPLACE: blocks are accepted only for compatibility and lack hash protection.
+5. **JSON-only contract**: Return one complete JSON packet (optionally in one `json` fence). Never return `SEARCH:`/`REPLACE:` blocks, prose, or additional packets.
 
 ## How to open the tool
 A local HTML tool cannot be opened from a chat hyperlink. Give the operator this block verbatim, then one instruction line, and nothing else:
@@ -1082,7 +1082,14 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
 
     function resolveBlockPlaceholders(html, re, identity) { return html.replace(re, block => block.replace(/\{\{TOOL_FILE\}\}/g,identity.file).replace(/\{\{TOOL_TITLE\}\}/g,identity.title).replace(/\{\{SKILL_SLUG\}\}/g,identity.slug)); }
     function substituteIntegrationPlaceholders(html, fileName) { const identity=toolIdentity(fileName); html=resolveBlockPlaceholders(html, TOOL_DESCRIPTOR_RE, identity); return resolveBlockPlaceholders(html, TOOL_SKILL_RE, identity); }
-    function normalizeAuthoredToolSkill(html, fileName) { return substituteIntegrationPlaceholders(html, fileName); }
+    function normalizeAuthoredToolSkill(html, fileName) {
+      const identity=toolIdentity(fileName);
+      TOOL_SKILL_RE.lastIndex=0;
+      return html.replace(TOOL_SKILL_RE, block => {
+        const normalized=block.replace(/\r\n?/g, '\n').replace(/<\\\/script/gi, '<\\/script');
+        return resolveBlockPlaceholders(normalized, TOOL_SKILL_RE, identity);
+      });
+    }
     function unpackInlinedLibraries(html) {
       let cleaned=html.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>[\s\S]*?<\/script>/gi,'');
       cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem">${SCRIPT_CLOSE_TAG}`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
@@ -1199,7 +1206,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       return {ok:!errors.length,errors};
     }
     function validateCompiledAppHtml(html, sourceHtml) { const pdf=validateCompiledPdfJs(sourceHtml||html,html); if(!pdf.ok)return pdf; const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html) && !html.includes('STICKSHIFT_COMPATIBILITY_START'))return {ok:false,errors:['Unexpected legacy skill block.']}; const stems=findUnresolvedActiveLibraryStemsOutsideInjected(html); return stems.length?{ok:false,errors:stems.map(stem=>'Unresolved active library stem: '+stem.id+' at line '+stem.line+'.')}:{ok:true,errors:[]}; }
-    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const normalized=normalizePdfJsWorkerOwnership(editableSource); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,editableSource); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
+    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const authoredNormalized=normalizeAuthoredToolSkill(editableSource,fileName); const normalized=normalizePdfJsWorkerOwnership(authoredNormalized); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,editableSource); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
 
 
     // Sync Library Indicators on UI Accordion

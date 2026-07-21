@@ -261,131 +261,46 @@ export default function App() {
     }
   };
 
-  // Parse and apply AI updates packet (SEARCH / REPLACE parser)
-  const applyAiPacketUpdate = () => {
+  // Apply one atomic JSON-only html-ide-patch v2 packet.
+  const sourceHash = async (source: string) => {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+    return 'sha256:' + Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+  };
+
+  const applyAiPacketUpdate = async () => {
     if (!aiPacket.trim()) {
-      alert('Please paste a non-empty AI Update Packet containing SEARCH: and REPLACE: blocks.');
+      alert('Please paste one complete JSON html-ide-patch v2 packet.');
       return;
     }
-
     setIsApplying(true);
-    
-    setTimeout(() => {
-      try {
-        const linesList = aiPacket.replace(/\r\n/g, '\n').split('\n');
-        interface SearchReplaceBlock {
-          search: string;
-          replace: string;
-        }
-        let blocks: SearchReplaceBlock[] = [];
-        let currentBlock: SearchReplaceBlock | null = null;
-        let stateMode: 'IDLE' | 'SEARCH' | 'REPLACE' = 'IDLE';
-
-        for (let i = 0; i < linesList.length; i++) {
-          const line = linesList[i];
-          const trimmed = line.trim();
-
-          if (trimmed === 'SEARCH:') {
-            if (currentBlock && stateMode === 'REPLACE') {
-              blocks.push(currentBlock);
-            }
-            currentBlock = { search: '', replace: '' };
-            stateMode = 'SEARCH';
-            continue;
-          } else if (trimmed === 'REPLACE:') {
-            if (stateMode === 'SEARCH' && currentBlock) {
-              stateMode = 'REPLACE';
-              continue;
-            }
-          }
-
-          if (stateMode === 'SEARCH' && currentBlock) {
-            currentBlock.search += line + '\n';
-          } else if (stateMode === 'REPLACE' && currentBlock) {
-            currentBlock.replace += line + '\n';
-          }
-        }
-
-        if (currentBlock && stateMode === 'REPLACE') {
-          blocks.push(currentBlock);
-        }
-
-        // Clean trailing newlines
-        blocks = blocks.map(b => ({
-          search: b.search.slice(0, -1),
-          replace: b.replace.slice(0, -1)
-        }));
-
-        if (blocks.length === 0) {
-          throw new Error('No valid SEARCH: and REPLACE: syntax detected in the pasted text.');
-        }
-
-        let workingCode = code;
-        let successCount = 0;
-        let failedBlocks: string[] = [];
-
-        for (let idx = 0; idx < blocks.length; idx++) {
-          const block = blocks[idx];
-          const exactIdx = workingCode.indexOf(block.search);
-
-          if (exactIdx !== -1) {
-            // Match 1: Precision substring replacement
-            workingCode = workingCode.replace(block.search, block.replace);
-            successCount++;
-          } else {
-            // Match 2: Flexible trimmed match for whitespace differences
-            const docLines = workingCode.split('\n');
-            const searchLines = block.search.split('\n').map(l => l.trim()).filter(l => l !== '');
-
-            let matchedIndex = -1;
-
-            for (let dIdx = 0; dIdx <= docLines.length - searchLines.length; dIdx++) {
-              let matches = true;
-              for (let sIdx = 0; sIdx < searchLines.length; sIdx++) {
-                if (docLines[dIdx + sIdx].trim() !== searchLines[sIdx]) {
-                  matches = false;
-                  break;
-                }
-              }
-              if (matches) {
-                matchedIndex = dIdx;
-                break;
-              }
-            }
-
-            if (matchedIndex !== -1 && searchLines.length > 0) {
-              const leadingSpacing = docLines[matchedIndex].match(/^\s*/)?.[0] || '';
-              const formattedReplacement = block.replace.split('\n').map((line, lIdx) => {
-                if (lIdx === 0) return line;
-                return leadingSpacing + line;
-              }).join('\n');
-
-              docLines.splice(matchedIndex, searchLines.length, formattedReplacement);
-              workingCode = docLines.join('\n');
-              successCount++;
-            } else {
-              failedBlocks.push(`Block ${idx + 1}: "${block.search.substring(0, 50)}..."`);
-            }
-          }
-        }
-
-        if (successCount > 0) {
-          setCode(workingCode);
-          setAiPacket(''); // Clear upon success
-          
-          if (failedBlocks.length > 0) {
-            alert(`Applied ${successCount} adjustments successfully!\n\nFailed to match ${failedBlocks.length} blocks:\n` + failedBlocks.join('\n'));
-          }
-        } else {
-          alert('Could not apply updates. The specified SEARCH blocks were not found in the source code. Please verify character matching and blank lines.');
-        }
-
-      } catch (err: any) {
-        alert(err.message || 'Error occurred while parsing update blocks.');
-      } finally {
-        setIsApplying(false);
+    try {
+      const fenced = aiPacket.trim().match(/^```json\s*\n([\s\S]*?)\n```$/i);
+      const packet = JSON.parse(fenced ? fenced[1] : aiPacket);
+      if (packet.protocol !== 'html-ide-patch' || packet.version !== '2.0') throw new Error('Only html-ide-patch version 2.0 JSON packets are supported.');
+      if (!packet.target?.sourceHash || packet.target.sourceHash !== await sourceHash(code)) throw new Error('Stale patch rejected: target.sourceHash must match the exact current source.');
+      if (!Array.isArray(packet.patches) || !packet.patches.length) throw new Error('A non-empty patches array is required.');
+      const ids = new Set<string>();
+      const operations = new Set(['replace', 'insert_before', 'insert_after', 'delete']);
+      const resolved = packet.patches.map((patch: any, index: number) => {
+        if (!patch?.id || typeof patch.id !== 'string' || ids.has(patch.id)) throw new Error(`Patch #${index + 1} requires a unique string id.`);
+        ids.add(patch.id);
+        if (!operations.has(patch.operation) || patch.matching?.strategy !== 'exact' || !Number.isInteger(patch.matching?.expectedMatches) || patch.matching.expectedMatches < 1 || !patch.matching.search) throw new Error(`Patch ${patch.id} is not a valid exact-match v2 operation.`);
+        const search = patch.matching.search as string, matches: number[] = []; let at = code.indexOf(search);
+        while (at !== -1) { matches.push(at); at = code.indexOf(search, at + Math.max(1, search.length)); }
+        if (matches.length !== patch.matching.expectedMatches) throw new Error(`Patch ${patch.id} expected ${patch.matching.expectedMatches} match(es), found ${matches.length}.`);
+        return { patch, matches };
+      });
+      const ranges = resolved.flatMap(({ patch, matches }: any) => matches.map((start: number) => ({ patch, start, end: start + patch.matching.search.length }))).sort((left: any, right: any) => right.start - left.start);
+      if (ranges.some((range: any, index: number) => index && range.end > ranges[index - 1].start)) throw new Error('Overlapping patch ranges are rejected.');
+      let output = code;
+      for (const { patch, start, end } of ranges) {
+        const replacement = patch.operation === 'delete' ? '' : (patch.replacement || '');
+        output = patch.operation === 'insert_before' ? output.slice(0, start) + replacement + output.slice(start) : patch.operation === 'insert_after' ? output.slice(0, end) + replacement + output.slice(end) : output.slice(0, start) + replacement + output.slice(end);
       }
-    }, 400);
+      setCode(output); setAiPacket('');
+    } catch (err: any) {
+      alert(err.message || 'Error occurred while parsing the JSON update packet.');
+    } finally { setIsApplying(false); }
   };
 
   // Standalone File Export
@@ -438,32 +353,10 @@ export default function App() {
   };
 
   // Demo packet loading helper
-  const handleLoadDemoPacket = (e: React.MouseEvent) => {
+  const handleLoadDemoPacket = async (e: React.MouseEvent) => {
     e.preventDefault();
-    setAiPacket(`SEARCH:
-    <!-- Circular Dial Visual -->
-    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
-      <div class="absolute inset-0 rounded-full border-4 border-slate-800/50"></div>
-      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-500 transition-all duration-1000 rotate-45 animate-pulse"></div>
-      
-      <!-- Time counter -->
-      <div class="z-10">
-        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white">25:00</span>
-        <div id="sessionType" class="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
-      </div>
-    </div>
-REPLACE:
-    <!-- Circular Dial Visual (Enhanced with subtle glow border) -->
-    <div class="relative w-64 h-64 mx-auto mb-10 flex items-center justify-center">
-      <div class="absolute inset-0 rounded-full border-4 border-purple-500/30 shadow-lg shadow-purple-500/20"></div>
-      <div id="radialFill" class="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-500 border-r-purple-500 transition-all duration-1000 rotate-45"></div>
-      
-      <!-- Time counter -->
-      <div class="z-10">
-        <span id="timerDisplay" class="text-5xl font-mono font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]">25:00</span>
-        <div id="sessionType" class="text-[10px] text-purple-400 uppercase tracking-widest font-semibold mt-2">Work Interval</div>
-      </div>
-    </div>`);
+    const search = '<h1 class="text-xl font-bold text-white mb-2">';
+    setAiPacket(JSON.stringify({ protocol: 'html-ide-patch', version: '2.0', target: { sourceHash: await sourceHash(code) }, patches: [{ id: 'example-heading', operation: 'insert_after', matching: { strategy: 'exact', expectedMatches: 1, search }, replacement: 'Updated: ' }] }, null, 2));
     setAiDrawerOpen(true);
   };
 
@@ -608,7 +501,7 @@ REPLACE:
                 </div>
                 <div className="text-left">
                   <span className="text-xs font-semibold text-gray-200">Paste AI Update Packet</span>
-                  <p className="text-[9px] text-gray-500 font-mono">Apply modifications using strict SEARCH: & REPLACE: structure</p>
+                  <p className="text-[9px] text-gray-500 font-mono">Apply JSON-only html-ide-patch v2 updates</p>
                 </div>
               </div>
               <div className="flex items-center space-x-3">
@@ -630,12 +523,12 @@ REPLACE:
                     <textarea 
                       value={aiPacket}
                       onChange={(e) => setAiPacket(e.target.value)}
-                      placeholder={`SEARCH:\n<div class="old-code">...</div>\n\nREPLACE:\n<div class="new-code">...</div>`}
+                      placeholder={`{\n  "protocol": "html-ide-patch",\n  "version": "2.0",\n  ...\n}`}
                       className="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"
                     />
                     
                     <div className="absolute right-3.5 bottom-3 text-[10px] text-gray-600 font-mono select-none">
-                      Supports multiple blocks
+                      One JSON packet; a fenced JSON packet is accepted
                     </div>
                   </div>
 

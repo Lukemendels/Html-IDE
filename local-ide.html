@@ -470,7 +470,7 @@ Check your Browserslist config to be sure that your targets are set up correctly
             </div>
             <div class="text-left">
               <span class="text-xs font-semibold text-gray-200">Paste AI Update Packet</span>
-              <p class="text-[9px] text-gray-500 font-mono">Apply structured html-ide-patch v2 packets; legacy SEARCH/REPLACE remains supported</p>
+              <p class="text-[9px] text-gray-500 font-mono">Apply JSON-only html-ide-patch v2 packets</p>
             </div>
           </div>
           <div class="flex items-center space-x-3">
@@ -482,10 +482,10 @@ Check your Browserslist config to be sure that your targets are set up correctly
         <!-- Drawer Content (Collapsible) -->
         <div id="aiDrawerContent" class="px-5 pb-5 space-y-3.5 overflow-hidden transition-all duration-300">
           <div class="relative">
-            <textarea id="aiPacketInput" placeholder="SEARCH:&#10;<div class=&quot;old-code&quot;>...</div>&#10;&#10;REPLACE:&#10;<div class=&quot;new-code&quot;>...</div>" class="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"></textarea>
+            <textarea id="aiPacketInput" placeholder="{&#10;  &quot;protocol&quot;: &quot;html-ide-patch&quot;,&#10;  &quot;version&quot;: &quot;2.0&quot;,&#10;  ...&#10;}" class="w-full h-32 bg-[#16161a] border border-gray-800 rounded-xl p-3 text-xs font-mono text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 resize-none transition-all focus:ring-1 focus:ring-purple-500/20"></textarea>
 
             <div class="absolute right-3.5 bottom-3 text-[10px] text-gray-600 font-mono select-none">
-              Supports multiple blocks
+              JSON or a single fenced JSON packet
             </div>
           </div>
 
@@ -703,7 +703,7 @@ For edits to an existing app, generate a structured JSON `html-ide-patch` versio
 2. **No Ambiguity**: If a search block appears more than once, add stable surrounding context or use a named region; do not rely on first occurrence.
 3. **Atomicity**: All patches must be valid together. One bad patch rejects the whole packet.
 4. **Library Safety**: Insert Stem Tags for libraries; never paste full bundled library payloads.
-5. **Legacy**: SEARCH:/REPLACE: blocks are accepted only for compatibility and lack hash protection.
+5. **JSON-only contract**: Return one complete JSON packet (optionally in one `json` fence). Never return `SEARCH:`/`REPLACE:` blocks, prose, or additional packets.
 
 ## How to open the tool
 A local HTML tool cannot be opened from a chat hyperlink. Give the operator this block verbatim, then one instruction line, and nothing else:
@@ -3239,33 +3239,12 @@ Prism.languages.js = Prism.languages.javascript;
   async function sourceHash(source) { return 'sha256:' + await sha256Hex(source); }
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
-  function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(packetText).split('\n');
-    let blocks = [], currentBlock = null, stateMode = 'IDLE';
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === 'SEARCH:') {
-        if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
-        currentBlock = { search: '', replace: '' };
-        stateMode = 'SEARCH';
-        continue;
-      }
-      if (trimmed === 'REPLACE:' && stateMode === 'SEARCH' && currentBlock) { stateMode = 'REPLACE'; continue; }
-      if (stateMode === 'SEARCH' && currentBlock) currentBlock.search += line + '\n';
-      if (stateMode === 'REPLACE' && currentBlock) currentBlock.replace += line + '\n';
-    }
-    if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
-    blocks = blocks.map((b, i) => ({ id: 'legacy-' + (i + 1), operation: 'replace', matching: { strategy: 'exact', expectedMatches: 1, search: b.search.slice(0, -1) }, replacement: b.replace.slice(0, -1) }));
-    if (!blocks.length) throw new Error('No valid structured JSON packet or legacy SEARCH:/REPLACE: blocks were found.');
-    return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
-  }
-
   function stripCodeFences(text) { const trimmed=String(text || '').trim(); const match=trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```$/i); return match ? match[1] : String(text || ''); }
 
   function parsePatchPacket(packetText) {
     packetText = stripCodeFences(packetText);
     const trimmed = String(packetText || '').trim();
-    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
+    if (!trimmed.startsWith('{')) throw new Error('Patch packets must be a complete JSON html-ide-patch v2.0 object.');
     let parsed;
     try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
     if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
@@ -3373,7 +3352,7 @@ Prism.languages.js = Prism.languages.javascript;
   async function preflightPatchPacket(packetText, source) {
     const packet = parsePatchPacket(packetText);
     const currentHash = await sourceHash(source);
-    if (!packet.legacy && packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
+    if (packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
     const resolvedItems = [];
     for (const patch of packet.patches) {
       const resolution = resolvePatch(source, patch);
@@ -3387,12 +3366,11 @@ Prism.languages.js = Prism.languages.javascript;
   }
 
   function summarizePreflight(report, source) {
-    const lines = [(report.packet.legacy ? 'Legacy SEARCH/REPLACE compatibility packet' : 'Structured html-ide-patch v2 packet'), 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
+    const lines = ['Structured JSON html-ide-patch v2 packet', 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
     report.resolvedItems.forEach(item => {
       const ranges = item.resolution.matches.map(m => 'line ' + lineFromIndex(source, m.start) + ', chars ' + m.start + '-' + m.end).join('; ');
       lines.push('- ' + item.patch.id + ' [' + item.patch.operation + '] ' + ranges);
     });
-    if (report.packet.legacy) lines.push('Warning: legacy packets do not include source hashes and are less safe than v2 JSON packets.');
     return lines.join('\n');
   }
 
@@ -3406,7 +3384,7 @@ Prism.languages.js = Prism.languages.javascript;
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });
 
 
@@ -3816,7 +3794,14 @@ Prism.languages.js = Prism.languages.javascript;
 
     function resolveBlockPlaceholders(html, re, identity) { return html.replace(re, block => block.replace(/\{\{TOOL_FILE\}\}/g,identity.file).replace(/\{\{TOOL_TITLE\}\}/g,identity.title).replace(/\{\{SKILL_SLUG\}\}/g,identity.slug)); }
     function substituteIntegrationPlaceholders(html, fileName) { const identity=toolIdentity(fileName); html=resolveBlockPlaceholders(html, TOOL_DESCRIPTOR_RE, identity); return resolveBlockPlaceholders(html, TOOL_SKILL_RE, identity); }
-    function normalizeAuthoredToolSkill(html, fileName) { return substituteIntegrationPlaceholders(html, fileName); }
+    function normalizeAuthoredToolSkill(html, fileName) {
+      const identity=toolIdentity(fileName);
+      TOOL_SKILL_RE.lastIndex=0;
+      return html.replace(TOOL_SKILL_RE, block => {
+        const normalized=block.replace(/\r\n?/g, '\n').replace(/<\\\/script/gi, '<\\/script');
+        return resolveBlockPlaceholders(normalized, TOOL_SKILL_RE, identity);
+      });
+    }
     function unpackInlinedLibraries(html) {
       let cleaned=html.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>[\s\S]*?<\/script>/gi,'');
       cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem">${SCRIPT_CLOSE_TAG}`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
@@ -3933,7 +3918,7 @@ Prism.languages.js = Prism.languages.javascript;
       return {ok:!errors.length,errors};
     }
     function validateCompiledAppHtml(html, sourceHtml) { const pdf=validateCompiledPdfJs(sourceHtml||html,html); if(!pdf.ok)return pdf; const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html) && !html.includes('STICKSHIFT_COMPATIBILITY_START'))return {ok:false,errors:['Unexpected legacy skill block.']}; const stems=findUnresolvedActiveLibraryStemsOutsideInjected(html); return stems.length?{ok:false,errors:stems.map(stem=>'Unresolved active library stem: '+stem.id+' at line '+stem.line+'.')}:{ok:true,errors:[]}; }
-    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const normalized=normalizePdfJsWorkerOwnership(editableSource); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,editableSource); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
+    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const authoredNormalized=normalizeAuthoredToolSkill(editableSource,fileName); const normalized=normalizePdfJsWorkerOwnership(authoredNormalized); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,editableSource); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
 
 
     // Sync Library Indicators on UI Accordion
