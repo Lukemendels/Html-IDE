@@ -29,9 +29,7 @@ async function reject(label, promise, pattern) { await assert.rejects(promise, p
   const fencedJson = '```json\n' + await packet(source, [p('fenced-json', 'replace', '<h1>Title</h1>', '<h1>Fenced</h1>')]) + '\n```';
   report = await engine.preflightPatchPacket(fencedJson, source);
   assert(report.output.includes('Fenced'), 'fenced JSON packet');
-  const fencedLegacy = '```\nSEARCH:\n<button>Save</button>\nREPLACE:\n<button>Fenced</button>\n```';
-  report = await engine.preflightPatchPacket(fencedLegacy, source);
-  assert(report.packet.legacy && report.output.includes('Fenced'), 'fenced legacy packet');
+  await reject('fenced legacy packet', engine.preflightPatchPacket('```\nSEARCH:\n<button>Save</button>\nREPLACE:\n<button>Fenced</button>\n```', source), /must be a complete JSON/);
 
   await reject('malformed JSON', engine.preflightPatchPacket('{bad', source), /Malformed JSON/);
   await reject('unsupported protocol', engine.preflightPatchPacket(JSON.stringify({ protocol: 'other', version: '2.0' }), source), /Unsupported patch protocol/);
@@ -63,9 +61,7 @@ async function reject(label, promise, pattern) { await assert.rejects(promise, p
   const tx = { before: 'old', after: 'new', resultHash: await engine.sourceHash('new') };
   assert.notEqual(await engine.sourceHash('manual edit'), tx.resultHash, 'undo after intervening manual changes is detectable');
 
-  const legacy = await engine.preflightPatchPacket('SEARCH:\n<button>Save</button>\nREPLACE:\n<button>Go</button>', source);
-  assert(legacy.packet.legacy, 'legacy SEARCH/REPLACE behavior');
-  assert(legacy.output.includes('<button>Go</button>'), 'legacy output');
+  await reject('legacy packet', engine.preflightPatchPacket('SEARCH:\n<button>Save</button>\nREPLACE:\n<button>Go</button>', source), /must be a complete JSON/);
 
   console.log('production patch engine tests passed');
 })().catch(err => { console.error(err); process.exit(1); });

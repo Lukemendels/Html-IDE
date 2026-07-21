@@ -18,33 +18,12 @@
   async function sourceHash(source) { return 'sha256:' + await sha256Hex(source); }
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
-  function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(packetText).split('\n');
-    let blocks = [], currentBlock = null, stateMode = 'IDLE';
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === 'SEARCH:') {
-        if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
-        currentBlock = { search: '', replace: '' };
-        stateMode = 'SEARCH';
-        continue;
-      }
-      if (trimmed === 'REPLACE:' && stateMode === 'SEARCH' && currentBlock) { stateMode = 'REPLACE'; continue; }
-      if (stateMode === 'SEARCH' && currentBlock) currentBlock.search += line + '\n';
-      if (stateMode === 'REPLACE' && currentBlock) currentBlock.replace += line + '\n';
-    }
-    if (currentBlock && stateMode === 'REPLACE') blocks.push(currentBlock);
-    blocks = blocks.map((b, i) => ({ id: 'legacy-' + (i + 1), operation: 'replace', matching: { strategy: 'exact', expectedMatches: 1, search: b.search.slice(0, -1) }, replacement: b.replace.slice(0, -1) }));
-    if (!blocks.length) throw new Error('No valid structured JSON packet or legacy SEARCH:/REPLACE: blocks were found.');
-    return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
-  }
-
   function stripCodeFences(text) { const trimmed=String(text || '').trim(); const match=trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```$/i); return match ? match[1] : String(text || ''); }
 
   function parsePatchPacket(packetText) {
     packetText = stripCodeFences(packetText);
     const trimmed = String(packetText || '').trim();
-    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
+    if (!trimmed.startsWith('{')) throw new Error('Patch packets must be a complete JSON html-ide-patch v2.0 object.');
     let parsed;
     try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
     if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
@@ -152,7 +131,7 @@
   async function preflightPatchPacket(packetText, source) {
     const packet = parsePatchPacket(packetText);
     const currentHash = await sourceHash(source);
-    if (!packet.legacy && packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
+    if (packet.target.sourceHash !== currentHash) throw new Error('Stale patch rejected. Expected ' + packet.target.sourceHash + ' but current source is ' + currentHash + '.');
     const resolvedItems = [];
     for (const patch of packet.patches) {
       const resolution = resolvePatch(source, patch);
@@ -166,12 +145,11 @@
   }
 
   function summarizePreflight(report, source) {
-    const lines = [(report.packet.legacy ? 'Legacy SEARCH/REPLACE compatibility packet' : 'Structured html-ide-patch v2 packet'), 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
+    const lines = ['Structured JSON html-ide-patch v2 packet', 'Source: ' + report.currentHash, 'Result: ' + report.nextHash, 'Patch count: ' + report.packet.patches.length];
     report.resolvedItems.forEach(item => {
       const ranges = item.resolution.matches.map(m => 'line ' + lineFromIndex(source, m.start) + ', chars ' + m.start + '-' + m.end).join('; ');
       lines.push('- ' + item.patch.id + ' [' + item.patch.operation + '] ' + ranges);
     });
-    if (report.packet.legacy) lines.push('Warning: legacy packets do not include source hashes and are less safe than v2 JSON packets.');
     return lines.join('\n');
   }
 
@@ -185,5 +163,5 @@
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });
