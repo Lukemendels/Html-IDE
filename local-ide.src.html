@@ -1132,7 +1132,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       let output='', cursor=0, openRe=/<script\b[^>]*>/gi, m;
       while ((m=openRe.exec(html))) { output+=html.slice(cursor,m.index)+m[0]; let i=openRe.lastIndex;
         if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf(closeTag,i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
-        let mode=null, canStartRegex=true, regexClass=false, pendingControl=false, functionHeader=false, nextBraceIsBlock=false;
+        let mode=null, canStartRegex=true, regexClass=false, pendingControl=false, functionHeader=null, pendingClassKind=null, nextBraceKind=null, statementStart=true, pendingLabel=false;
         const parens=[], braces=[];
         for(;i<html.length;i++){
           const c=html[i],n=html[i+1],close=html.slice(i,i+closePrefix.length).toLowerCase()===closePrefix;
@@ -1148,28 +1148,34 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
             else if(c==='/'&&!regexClass){while(/[a-z]/i.test(html[i+1]||'')){output+=html[++i];}mode=null;canStartRegex=false;}
             continue;
           }
-          if(mode){if(c==='\\'){output+=n||'';i++;}else if(c===mode){mode=null;canStartRegex=false;}continue;}
+          if(mode){if(c==='\\'){output+=n||'';i++;}else if(c===mode){mode=null;canStartRegex=false;statementStart=false;}continue;}
           if(/\s/.test(c))continue;
           if(c==='"'||c==="'"||c==='`'){mode=c;continue;}
           if(c==='/'&&n==='/'){output+=n;i++;mode='L';continue;}
           if(c==='/'&&n==='*'){output+=n;i++;mode='B';continue;}
-          if(c==='/'&&canStartRegex&&n!=='='){mode='R';regexClass=false;continue;}
-          if(c==='/'){if(n==='='){output+=n;i++;}canStartRegex=true;continue;}
+          if(c==='/'&&canStartRegex&&n!=='='){mode='R';regexClass=false;nextBraceKind=null;statementStart=false;continue;}
+          if(c==='/'){if(n==='='){output+=n;i++;}canStartRegex=true;statementStart=false;continue;}
           if(/[A-Za-z_$]/.test(c)){
             let word=c;while(/[A-Za-z0-9_$]/.test(html[i+1]||'')){word+=html[++i];output+=word[word.length-1];}
-            if(['if','while','for','with','switch'].includes(word)){pendingControl=true;canStartRegex=true;}
-            else if(word==='else'||word==='do'){nextBraceIsBlock=true;canStartRegex=true;}
-            else if(word==='function'){functionHeader=true;canStartRegex=true;}
-            else canStartRegex=scriptKeywordCanStartRegex(word);
+            if(['if','while','for','with','switch'].includes(word)){pendingControl=true;canStartRegex=true;statementStart=false;}
+            else if(word==='else'||word==='do'){nextBraceKind='statement-block';canStartRegex=true;statementStart=true;}
+            else if(word==='try'||word==='catch'||word==='finally'){nextBraceKind=word+'-block';canStartRegex=true;statementStart=false;}
+            else if(word==='async'&&statementStart&&/^\s+function\b/.test(html.slice(i+1))){canStartRegex=true;statementStart=true;}
+            else if(word==='function'){functionHeader=statementStart?'function-declaration':'function-expression';canStartRegex=true;statementStart=false;}
+            else if(word==='class'){pendingClassKind=statementStart?'class-declaration':'class-expression';canStartRegex=true;statementStart=false;}
+            else {pendingLabel=statementStart;canStartRegex=scriptKeywordCanStartRegex(word);statementStart=false;}
             continue;
           }
-          if(/[0-9]/.test(c)){while(/[0-9A-Za-z_.]/.test(html[i+1]||''))output+=html[++i];canStartRegex=false;continue;}
-          if(c==='('){parens.push(pendingControl?'control':functionHeader?'function':'value');pendingControl=false;functionHeader=false;canStartRegex=true;continue;}
-          if(c===')'){const kind=parens.pop();nextBraceIsBlock=kind==='control'||kind==='function';canStartRegex=kind==='control';continue;}
-          if(c===String.fromCharCode(123)){braces.push(nextBraceIsBlock?'block':'object');nextBraceIsBlock=false;canStartRegex=true;continue;}
-          if(c===String.fromCharCode(125)){canStartRegex=braces.pop()==='block';continue;}
-          if((c==='+'||c==='-')&&n===c){output+=n;i++;canStartRegex=false;continue;}
+          if(/[0-9]/.test(c)){while(/[0-9A-Za-z_.]/.test(html[i+1]||''))output+=html[++i];canStartRegex=false;statementStart=false;continue;}
+          if(c==='('){parens.push(pendingControl?'control':functionHeader||'value');pendingControl=false;functionHeader=null;canStartRegex=true;statementStart=false;continue;}
+          if(c===')'){const kind=parens.pop();if(kind==='control')nextBraceKind=nextBraceKind||'control-block';else if(kind==='function-declaration'||kind==='function-expression')nextBraceKind=kind;canStartRegex=kind==='control';statementStart=false;continue;}
+          if(c===String.fromCharCode(123)){const kind=nextBraceKind||pendingClassKind||(statementStart?'statement-block':'object');braces.push(kind);nextBraceKind=null;pendingClassKind=null;canStartRegex=true;statementStart=true;continue;}
+          if(c===String.fromCharCode(125)){const kind=braces.pop(), expression=kind==='object'||kind==='function-expression'||kind==='class-expression';canStartRegex=!expression;statementStart=!expression;continue;}
+          if(c===';'){canStartRegex=true;statementStart=true;pendingLabel=false;continue;}
+          if(c===':'){if(pendingLabel){statementStart=true;canStartRegex=true;}else canStartRegex=true;pendingLabel=false;continue;}
+          if((c==='+'||c==='-')&&n===c){output+=n;i++;canStartRegex=false;statementStart=false;continue;}
           canStartRegex=scriptPunctuationCanStartRegex(c);
+          statementStart=false;
         }
         const closeEnd=html.indexOf('>',i); if(i<html.length&&closeEnd>=0){output+=html.slice(i,closeEnd+1);cursor=closeEnd+1;openRe.lastIndex=cursor;}else{cursor=i;break;}
       } return output+html.slice(cursor);

@@ -88,3 +88,38 @@ for (const source of valueDivisionSources) {
   assert.equal(escapeInlineScriptBreakouts(html), html, `value expression remains division: ${source}`);
   compile(executableScripts(html)[0].body);
 }
+
+const statementBlockRegexSources = [
+  "class C {} /['\"]/.test(value);",
+  "class C extends Base {} /['\"]/.test(value);",
+  "try {} catch (error) {} /['\"]/.test(value);",
+  "try {} catch {} /['\"]/.test(value);",
+  "try {} finally {} /['\"]/.test(value);",
+  "try {} catch (error) {} finally {} /['\"]/.test(value);",
+  "{ run(); } /['\"]/.test(value);",
+  "label: { run(); } /['\"]/.test(value);",
+  "function initialize() {} /['\"]/.test(value);",
+  "function* generate() {} /['\"]/.test(value);",
+  "async function initialize() {} /['\"]/.test(value);"
+];
+for (const source of statementBlockRegexSources) {
+  const html = `<script>${source}</script>`;
+  const normalized = escapeInlineScriptBreakouts(html);
+  assert.equal(normalized, html, `statement block retains a following regex statement: ${source}`);
+  assert.equal((normalized.match(/<\/script>/gi) || []).length, 1, `statement block retains one structural close: ${source}`);
+  compile(executableScripts(normalized)[0].body);
+}
+
+const expressionValueDivisionSources = [
+  'const a = function () {} / divisor;',
+  'const b = function named() {} / divisor;',
+  'const c = class {} / divisor;',
+  'const d = class Named {} / divisor;',
+  'const e = ({ value: total }) / divisor;'
+];
+for (const source of expressionValueDivisionSources) {
+  const html = `<script>${source}</script>`;
+  assert.equal(escapeInlineScriptBreakouts(html), html, `expression value retains division: ${source}`);
+  assert.equal((html.match(/<\/script>/gi) || []).length, 1, `expression value retains one structural close: ${source}`);
+  compile(executableScripts(html)[0].body);
+}
