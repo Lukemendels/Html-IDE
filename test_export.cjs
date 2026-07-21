@@ -31,4 +31,9 @@ const importedRegistration = apiImport.unpackInlinedLibraries(registration);
 check('registration ABI import restores descriptor-only source', apiImport.parseToolDescriptor(importedRegistration).descriptor.skill === null && apiImport.toolSkillBlocks(importedRegistration).length === 0);
 const importedAuthored = apiImport.unpackInlinedLibraries(authoredCompiled);
 check('authored ABI import restores one Tool Skill', apiImport.toolSkillBlocks(importedAuthored).length === 1 && apiImport.parseToolDescriptor(importedAuthored).descriptor.skill.elementId === 'tool-skill');
+
+const dataStemOnly = '<html><body><script type="text/markdown">Example <script id="lib-pdfjs-stem"></script></script></body></html>';
+check('markdown-only PDF.js example does not request a PDF.js triplet', !api.compileAppSource(dataStemOnly,{fileName:'plain.html'}).html.includes('injected-lib-pdfjs'));
+let unknownError=''; try { api.compileAppSource('<html><body><script id="lib-sheets-stem"></script></body></html>',{fileName:'bad.html'}); } catch (error) { unknownError=String(error.message); }
+check('unknown active library stem reports its exact ID', unknownError.includes('lib-sheets-stem'));
 if (failures) process.exit(1);
