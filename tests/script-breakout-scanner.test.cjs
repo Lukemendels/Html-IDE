@@ -10,8 +10,9 @@ function extractFunction(name) {
   throw new Error(`unterminated ${name}`);
 }
 const acorn = require('acorn');
-const escapeInlineScriptBreakouts = new Function('acorn', `${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn escapeInlineScriptBreakouts;`)(acorn);
-function isDataScript(openTag) { return /\btype\s*=\s*["'](?:application\/(?:json|ld\+json)|text\/(?:plain|markdown))["']/i.test(openTag); }
+const escapeInlineScriptBreakouts = new Function('acorn', `${extractFunction('classifyScriptOpenTag')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn escapeInlineScriptBreakouts;`)(acorn);
+function isDataScript(openTag) { return !['classic-javascript', 'module'].includes(classifyScriptOpenTag(openTag)); }
+function classifyScriptOpenTag(openTag) { const match=openTag.match(/\btype\s*=\s*(?:["']([^"']*)["']|([^\s>]+))/i), type=(match?(match[1]||match[2]):'').trim().toLowerCase().split(';')[0].trim(); return !type?'classic-javascript':type==='module'?'module':/^(?:text|application)\/(?:javascript|ecmascript|x-javascript)$/.test(type)?'classic-javascript':'data'; }
 function extractStructuralScripts(html) {
   const scripts = [], re = /<script\b[^>]*>/gi; let match;
   while ((match = re.exec(html))) { const end = html.toLowerCase().indexOf('</script>', re.lastIndex); if (end < 0) throw new Error(`unclosed structural script after ${match.index}`); scripts.push({ open: match[0], body: html.slice(re.lastIndex, end) }); re.lastIndex = end + 9; }
@@ -154,3 +155,27 @@ for (const source of objectPropertyRegexSources) {
   assert.equal((normalized.match(/<\/script>/gi) || []).length, 1, `object property regex retains one structural close: ${source}`);
   compile(executableScripts(normalized)[0].body);
 }
+
+
+const lineCommentCases = [
+  { source: '<script>const x = 1; // trailing comment</script>', escaped: 0 },
+  { source: '<script>// comment</script>', escaped: 0 },
+  { source: '<script type="module">// comment</script>', escaped: 0 },
+  { source: '<script>// authored </script>\nconst x = 1;\n</script>', escaped: 1 },
+  { source: '<script>// authored </script></script>', escaped: 1 }
+];
+for (const test of lineCommentCases) {
+  const normalized = escapeInlineScriptBreakouts(test.source);
+  assert.equal((normalized.match(/<\\\/script>/g) || []).length, test.escaped, `line comment escaping count: ${test.source}`);
+  assert.equal((normalized.match(/<\/script>/gi) || []).length, 1, `line comment retains one structural close: ${test.source}`);
+  const script = executableScripts(normalized); assert.equal(script.length, 1, `line comment script extracts: ${test.source}`);
+  compile(script[0].body);
+  assert.equal(escapeInlineScriptBreakouts(normalized), normalized, `line comment normalization is idempotent: ${test.source}`);
+}
+const dataScriptSources = [
+  '<script type="text/html"><div>{{ value }}</div></script>',
+  '<script type="text/x-template"><div>{{ value }}</div></script>',
+  '<script type="importmap">\n{"imports":{"example":"/example.js"}}\n</script>',
+  '<script type="speculationrules">\n{"prefetch":[]}\n</script>'
+];
+for (const source of dataScriptSources) assert.equal(escapeInlineScriptBreakouts(source), source, `non-JavaScript data script is unchanged: ${source}`);
