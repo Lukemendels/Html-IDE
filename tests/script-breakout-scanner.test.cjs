@@ -57,3 +57,34 @@ assert.equal((breakoutCompiled.match(/<\\\/script>/g) || []).length, 5, 'strings
 assert.equal((breakoutCompiled.match(/<\/script>/gi) || []).length, 1, 'only the structural closing tag remains raw');
 assert.equal(escapeInlineScriptBreakouts(breakoutCompiled), breakoutCompiled, 'breakout normalization is idempotent');
 compile(executableScripts(breakoutCompiled)[0].body);
+
+const controlFlowRegexSources = [
+  "if (ready) /['\"]/.test(value);",
+  "while (ready) /['\"]/.test(value);",
+  "for (;;) /['\"]/.test(value);",
+  "with (context) /['\"]/.test(value);",
+  "if (ready) run(); else /['\"]/.test(value);",
+  "do /['\"]/.test(value); while (false);",
+  "if (ready) {} /['\"]/.test(value);",
+  "function initialize() {} /['\"]/.test(value);"
+];
+for (const source of controlFlowRegexSources) {
+  const html = `<script>${source}</script>`;
+  const normalized = escapeInlineScriptBreakouts(html);
+  assert.equal(normalized, html, `control-flow regex statement remains byte-stable: ${source}`);
+  assert.equal((normalized.match(/<\/script>/gi) || []).length, 1, `control-flow regex retains one structural close: ${source}`);
+  compile(executableScripts(normalized)[0].body);
+}
+
+const valueDivisionSources = [
+  'const a = (total + tax) / count;',
+  'const b = getTotal() / count;',
+  'const c = values[index] / count;',
+  'const d = ({ value: total }).value / count;',
+  'const e = ({ value: total }) / count;'
+];
+for (const source of valueDivisionSources) {
+  const html = `<script>${source}</script>`;
+  assert.equal(escapeInlineScriptBreakouts(html), html, `value expression remains division: ${source}`);
+  compile(executableScripts(html)[0].body);
+}
