@@ -29,6 +29,9 @@ async function reject(label, promise, pattern) { await assert.rejects(promise, p
   const fencedJson = '```json\n' + await packet(source, [p('fenced-json', 'replace', '<h1>Title</h1>', '<h1>Fenced</h1>')]) + '\n```';
   report = await engine.preflightPatchPacket(fencedJson, source);
   assert(report.output.includes('Fenced'), 'fenced JSON packet');
+  assert.equal(engine.stripCodeFences('```html\r\n<p>kept</p>\r\n```'), '<p>kept</p>', 'CRLF HTML fence is stripped');
+  assert.equal(engine.stripCodeFences('before\n```json\n{}\n```'), 'before\n```json\n{}\n```', 'commentary outside fence is retained for parser rejection');
+  assert.equal(engine.parseLegacySearchReplace('```\r\nSEARCH:\r\n<button>Save</button>\r\nREPLACE:\r\n<button>Direct</button>\r\n```').patches[0].replacement, '<button>Direct</button>', 'direct legacy parser accepts fenced CRLF input');
   const fencedLegacy = '```\nSEARCH:\n<button>Save</button>\nREPLACE:\n<button>Fenced</button>\n```';
   report = await engine.preflightPatchPacket(fencedLegacy, source);
   assert(report.packet.legacy && report.output.includes('Fenced'), 'fenced legacy packet');

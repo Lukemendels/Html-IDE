@@ -19,7 +19,7 @@
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
   function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(packetText).split('\n');
+    const lines = normalizeNewlines(stripCodeFences(packetText)).split('\n');
     let blocks = [], currentBlock = null, stateMode = 'IDLE';
     for (const line of lines) {
       const trimmed = line.trim();
@@ -39,7 +39,12 @@
     return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
   }
 
-  function stripCodeFences(text) { const trimmed=String(text || '').trim(); const match=trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```$/i); return match ? match[1] : String(text || ''); }
+  // Strip only one complete Markdown fence. Commentary or multiple fences remain input and are rejected by the packet parser.
+  function stripCodeFences(text) {
+    const original = String(text || '');
+    const match = original.match(/^\s*```(?:json|html)?[\t ]*\r?\n([\s\S]*?)\r?\n```[\t ]*\s*$/i);
+    return match ? match[1] : original;
+  }
 
   function parsePatchPacket(packetText) {
     packetText = stripCodeFences(packetText);
@@ -185,5 +190,5 @@
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, stripCodeFences, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });

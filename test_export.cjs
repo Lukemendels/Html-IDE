@@ -1,14 +1,26 @@
 const fs = require('fs');
 const src = fs.readFileSync('local-ide.src.html', 'utf8');
-const begin = src.indexOf('    // Source-resident Tool Descriptor');
+const begin = src.indexOf('    // Accept exactly one fenced');
 const end = src.indexOf('    // Sync Library Indicators', begin);
 const vault = {'lib-pdfjs': {textContent:'pdf-main'}, 'lib-pdfjs-worker': {textContent:'pdf-worker'}, 'lib-jszip': {textContent:'zip'}, 'lib-picocss': {textContent:'pico-css'}, 'lib-sheetjs': {textContent:'sheet-js'}};
-function apiFor(v) { return new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership};')({getElementById:id=>v[id]||null}); }
+function apiFor(v) { return new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership, unwrapFencedHtmlDocument, normalizeToolSkillScriptBreakouts};')({getElementById:id=>v[id]||null}); }
 const api = apiFor(vault);
 let failures=0; function check(name,value){console.log((value?'PASS ':'FAIL ')+name);if(!value)failures++;}
 const descriptor = `<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">{"schema":"stickshift-tool","version":"1.0","file":"{{TOOL_FILE}}","skillSlug":"{{SKILL_SLUG}}","title":"{{TOOL_TITLE}}","description":"Open a useful local demo tool.","open":{"protocol":"HTML_OPEN","tool":"{{TOOL_FILE}}"},"skill":null}</script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->`;
 const standalone = '<html><body><p>standalone</p></body></html>';
 check('standalone compilation remains plain', !api.compileAppSource(standalone,{fileName:'plain.html',embedStickShift:true}).html.includes('STICKSHIFT_TOOL'));
+const fenced='```html\n<!DOCTYPE html>\n<html><body>fenced</body></html>\n```';
+check('whole fenced HTML document unwraps', api.unwrapFencedHtmlDocument(fenced)==='<!DOCTYPE html>\n<html><body>fenced</body></html>');
+check('fenced partial HTML remains unchanged', api.unwrapFencedHtmlDocument('```html\n<div>partial</div>\n```').startsWith('```html'));
+check('fenced JSON remains unchanged', api.unwrapFencedHtmlDocument('```json\n{}\n```').startsWith('```json'));
+check('fence commentary remains unchanged', api.unwrapFencedHtmlDocument('note\n'+fenced) === 'note\n'+fenced);
+check('CRLF fenced document unwraps', api.unwrapFencedHtmlDocument('```htm\r\n<html></html>\r\n```') === '<html></html>');
+const rawSkill='<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">Explain why </script> terminates an HTML script element.</script>\n<!-- HTML_IDE_REGION:tool-skill:end -->';
+const normalizedSkill=api.normalizeToolSkillScriptBreakouts(rawSkill);
+check('marked Tool Skill raw close normalizes', normalizedSkill.html.includes('Explain why <\\/script>') && normalizedSkill.normalized);
+check('Tool Skill normalization is idempotent', api.normalizeToolSkillScriptBreakouts(normalizedSkill.html).html===normalizedSkill.html);
+let malformedSkill=''; try { api.normalizeToolSkillScriptBreakouts('<!-- HTML_IDE_REGION:tool-skill:start --><script id="tool-skill" type="text/markdown">x<!-- HTML_IDE_REGION:tool-skill:end -->'); } catch (error) { malformedSkill=String(error.message); }
+check('malformed Tool Skill region fails', /Malformed tool-skill/.test(malformedSkill));
 check('descriptor-only source validates', api.validateToolIntegration('<html><body>'+descriptor+'</body></html>',false).ok);
 const registration=api.compileAppSource('<html><body>'+descriptor+'</body></html>',{fileName:'demo.html',embedStickShift:true}).html;
 check('descriptor-only emits const legacy identity', registration.includes('const STICKSHIFT_TOOL = { file: "demo.html", skillSlug: "demo", title: "Demo" }'));
@@ -27,10 +39,17 @@ const fakeBody='<html><body><script>const t=`</body>`;</script></body></html>';
 check('region insertion anchors after script template', api.replaceNamedRegion(fakeBody,'tool-descriptor',descriptor).indexOf('tool-descriptor')>fakeBody.indexOf('</script>'));
 check('inline script breakout escaping is active', api.escapeInlineScriptBreakouts('<script>const x="</script>";</script>').includes('<\\/script>'));
 // Compatibility ABI round-trip keeps registration tools descriptor-only and restores authored workflow source.
-const apiImport = new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, toolSkillBlocks, parseToolDescriptor};')({getElementById:id=>vault[id]||null});
+const apiImport = new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, toolSkillBlocks, parseToolDescriptor, unwrapFencedHtmlDocument, normalizeToolSkillScriptBreakouts};')({getElementById:id=>vault[id]||null});
 const importedRegistration = apiImport.unpackInlinedLibraries(registration);
 check('registration ABI import restores descriptor-only source', apiImport.parseToolDescriptor(importedRegistration).descriptor.skill === null && apiImport.toolSkillBlocks(importedRegistration).length === 0);
 const importedAuthored = apiImport.unpackInlinedLibraries(authoredCompiled);
+const importedRegistrationAgain=apiImport.unpackInlinedLibraries(apiImport.compileAppSource(importedRegistration,{fileName:'demo.html',embedStickShift:true}).html);
+check('descriptor-only import is stable after canonicalization', importedRegistrationAgain===importedRegistration);
+const importedAuthoredAgain=apiImport.unpackInlinedLibraries(apiImport.compileAppSource(importedAuthored,{fileName:'workflow.html',embedStickShift:true}).html);
+check('authored Tool Skill import is stable after canonicalization', importedAuthoredAgain===importedAuthored);
+const rawSkillSource='<html><body>'+authoredDescriptor+'\n'+rawSkill+'</body></html>';
+const rawSkillCompiled=api.compileAppSource(rawSkillSource,{fileName:'skill.html'});
+check('raw Tool Skill example compiles without editing source', rawSkillCompiled.html.includes('Explain why <\\/script>') && rawSkillSource.includes('Explain why </script>') && rawSkillCompiled.validation.warnings.length===1);
 check('authored ABI import restores one Tool Skill', apiImport.toolSkillBlocks(importedAuthored).length === 1 && apiImport.parseToolDescriptor(importedAuthored).descriptor.skill.elementId === 'tool-skill');
 
 const dataStemOnly = '<html><body><script type="text/markdown">Example <script id="lib-pdfjs-stem"></script></script></body></html>';

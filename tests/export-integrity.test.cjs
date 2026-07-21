@@ -12,6 +12,9 @@ assert(!src.includes('cdn.tailwindcss.com'), 'template does not include default-
 assert(!src.includes('cdnjs.cloudflare.com'), 'template does not include default-app cdnjs');
 assert(!/availableLibraryStemManifest[\s\S]*<script id="lib-[^"]+-stem"><\/script>/.test(src), 'manifest must not contain raw closing script literals');
 assert(built.includes('window.HtmlIdePatchEngine') || built.includes('root.HtmlIdePatchEngine'), 'patch engine is inlined');
+assert(built.includes('function unwrapFencedHtmlDocument'), 'production artifact includes fenced-document unwrapping');
+assert.equal((built.match(/function normalizeToolSkillScriptBreakouts/g) || []).length, 1, 'production artifact has one Tool Skill breakout normalizer');
+assert(built.includes('stripCodeFences, parseLegacySearchReplace'), 'inlined patch engine exports stripCodeFences');
 
 function extractFunction(name) {
   const idx = src.indexOf('function ' + name + '(');

@@ -659,7 +659,7 @@ The IDE contains preloaded offline library assets. You can inject them instantly
 *IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag. The compilation packer will automatically inline the full library code on preview or download.
 
 ## Create Mode
-For a brand-new app, return exactly one complete HTML document and no Markdown fences or commentary. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
+For a brand-new app, raw HTML is the canonical output: return exactly one complete HTML document and no commentary. A single fenced `html`/`htm` whole document is tolerated and automatically unwrapped; commentary outside that fence is not accepted. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
 
 ## Tool Descriptor and Optional Tool Skill
 A standalone app may contain neither integration block. A registered tool contains one **Tool Descriptor** (structured JSON) and may contain one optional **Tool Skill**. The descriptor is metadata, not a skill, and may use `"skill": null`. Add a Tool Skill only for LLM-specific workflows; ordinary timers, calculators, dashboards, forms, and games do not need one. Both blocks are editable source and share the source hash; this IDE Coding Skill is immutable and outside `state.code`.
@@ -3240,7 +3240,7 @@ Prism.languages.js = Prism.languages.javascript;
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
   function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(packetText).split('\n');
+    const lines = normalizeNewlines(stripCodeFences(packetText)).split('\n');
     let blocks = [], currentBlock = null, stateMode = 'IDLE';
     for (const line of lines) {
       const trimmed = line.trim();
@@ -3260,7 +3260,12 @@ Prism.languages.js = Prism.languages.javascript;
     return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
   }
 
-  function stripCodeFences(text) { const trimmed=String(text || '').trim(); const match=trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```$/i); return match ? match[1] : String(text || ''); }
+  // Strip only one complete Markdown fence. Commentary or multiple fences remain input and are rejected by the packet parser.
+  function stripCodeFences(text) {
+    const original = String(text || '');
+    const match = original.match(/^\s*```(?:json|html)?[\t ]*\r?\n([\s\S]*?)\r?\n```[\t ]*\s*$/i);
+    return match ? match[1] : original;
+  }
 
   function parsePatchPacket(packetText) {
     packetText = stripCodeFences(packetText);
@@ -3406,7 +3411,7 @@ Prism.languages.js = Prism.languages.javascript;
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, stripCodeFences, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });
 
 
@@ -3575,8 +3580,14 @@ Prism.languages.js = Prism.languages.javascript;
     syncLineNumbers();
     triggerLivePreview();
 
-    // Monitor input changes in the editor
+    // Monitor input changes in the editor. A complete fenced HTML document is accepted as a paste convenience.
     jar.onUpdate((newCode) => {
+      const unwrapped = unwrapFencedHtmlDocument(newCode);
+      if (unwrapped !== newCode) {
+        state.code = unwrapped;
+        jar.updateCode(unwrapped);
+        return;
+      }
       state.code = newCode;
       syncLineNumbers();
       triggerLivePreview();
@@ -3757,7 +3768,7 @@ Prism.languages.js = Prism.languages.javascript;
       const reader = new FileReader();
       reader.onload = (evt) => {
         let loadedCode = evt.target.result;
-        loadedCode = unpackInlinedLibraries(loadedCode);
+        loadedCode = unwrapFencedHtmlDocument(unpackInlinedLibraries(loadedCode));
         state.code = loadedCode;
         jar.updateCode(loadedCode);
         state.currentFileName = file.name;
@@ -3768,6 +3779,15 @@ Prism.languages.js = Prism.languages.javascript;
       };
       reader.readAsText(file);
     });
+
+    // Accept exactly one fenced, complete HTML document; snippets and commentary are intentionally left untouched.
+    function unwrapFencedHtmlDocument(text) {
+      const original=String(text||'');
+      const match=original.match(/^\s*```(?:html|htm)?[\t ]*\r?\n([\s\S]*?)\r?\n```[\t ]*\s*$/i);
+      if(!match)return original;
+      const body=match[1];
+      return /^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body) ? body : original;
+    }
 
     // Source-resident Tool Descriptor and optional Tool Skill helpers.
     const SCRIPT_CLOSE_PREFIX = '<' + '/script';
@@ -3826,7 +3846,7 @@ Prism.languages.js = Prism.languages.javascript;
         if (!identity || !skill) throw new Error('Cannot import malformed StickShift compatibility block.');
         const [,file,slug,title]=identity, kind=skill[1], markdown=skill[2]; if(kind!=='registration'&&kind!=='authored')throw new Error('Unknown generated StickShift skill kind.');
         const descriptor={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:(markdown.match(/^description:\s*(.+)$/m)||[])[1]||'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:kind==='authored'?{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}:null};
-        cleaned=replaceDescriptor(removeNamedRegion(cleaned.replace(payload,''),'tool-descriptor'),descriptor);
+        cleaned=replaceDescriptor(cleaned.replace(payload,''),descriptor);
         if(kind==='authored'){ const body=extractAuthoredToolSkillBody(markdown,{file}); cleaned=replaceNamedRegion(cleaned,'tool-skill',`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${body}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`); }
       }
       const legacy=cleaned.match(/<!-- STICKSHIFT_SKILL_START -->[\s\S]*?<script\b(?=[^>]*\bid\s*=\s*["']stickshift-skill["'])[^>]*>([\s\S]*?)<\/script>[\s\S]*?<!-- STICKSHIFT_SKILL_END -->/i);
@@ -3846,11 +3866,21 @@ Prism.languages.js = Prism.languages.javascript;
       });
       return { html: masked, restore: value => value.replace(new RegExp(nonce + '(\\d+)__', 'g'), (_, i) => blocks[Number(i)]) };
     }
-    function escapeNamedDataRegionBreakouts(html) {
-      for (const name of ['tool-descriptor', 'tool-skill']) {
-        const region = findNamedRegion(html, name); if (!region) continue;
-        html = html.slice(0, region.start) + region.text.replace(/<\\\/script/gi, '<\\/script').replace(/<\/script/gi, '<\\/script') + html.slice(region.end);
-      } return html;
+    // Repairs only the marked Tool Skill payload on a compiled copy. The final closing tag is structural; earlier raw tokens are markdown examples.
+    function normalizeToolSkillScriptBreakouts(html) {
+      const region=findNamedRegion(html,'tool-skill');
+      if(!region)return {html, normalized:false};
+      const text=region.text, startMarker='<!-- HTML_IDE_REGION:tool-skill:start -->', endMarker='<!-- HTML_IDE_REGION:tool-skill:end -->';
+      const open=text.match(new RegExp('^'+startMarker.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*(<script\\b[^>]*>)','i'));
+      if(!open || !/\bid\s*=\s*["']tool-skill["']/i.test(open[1]) || !/\btype\s*=\s*["']text\/markdown["']/i.test(open[1])) throw new Error('Malformed tool-skill named region: expected a text/markdown tool-skill opening tag.');
+      const closeRe=/<\/script\s*>/gi, closes=[...text.matchAll(closeRe)];
+      if(!closes.length)throw new Error('Malformed tool-skill named region: missing final closing-script tag.');
+      const final=closes[closes.length-1], payloadStart=open[0].length, payloadEnd=final.index;
+      if(text.slice(final.index+final[0].length,-endMarker.length).trim())throw new Error('Malformed tool-skill named region: final closing-script tag must be immediately associated with the region.');
+      const payload=text.slice(payloadStart,payloadEnd), normalized=payload.replace(/<\/script/gi,'<\\/script');
+      if(normalized===payload)return {html,normalized:false};
+      const replacement=text.slice(0,payloadStart)+normalized+text.slice(payloadEnd);
+      return {html:html.slice(0,region.start)+replacement+html.slice(region.end),normalized:true};
     }
     function escapeInlineScriptBreakouts(html) {
       const closePrefix = '<' + '/script', closeTag = closePrefix + '>';
@@ -3933,7 +3963,7 @@ Prism.languages.js = Prism.languages.javascript;
       return {ok:!errors.length,errors};
     }
     function validateCompiledAppHtml(html, sourceHtml) { const pdf=validateCompiledPdfJs(sourceHtml||html,html); if(!pdf.ok)return pdf; const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html) && !html.includes('STICKSHIFT_COMPATIBILITY_START'))return {ok:false,errors:['Unexpected legacy skill block.']}; const stems=findUnresolvedActiveLibraryStemsOutsideInjected(html); return stems.length?{ok:false,errors:stems.map(stem=>'Unresolved active library stem: '+stem.id+' at line '+stem.line+'.')}:{ok:true,errors:[]}; }
-    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const normalized=normalizePdfJsWorkerOwnership(editableSource); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,editableSource); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
+    function compileAppSource(editableSource,options={}) { const skillNormalization=normalizeToolSkillScriptBreakouts(editableSource); const source=validateToolIntegration(skillNormalization.html,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const normalized=normalizePdfJsWorkerOwnership(skillNormalization.html); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,skillNormalization.html); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:{...v,warnings:skillNormalization.normalized?['Tool Skill closing-script token normalized in compiled output.']:[]}}; }
 
 
     // Sync Library Indicators on UI Accordion
