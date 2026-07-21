@@ -3,7 +3,8 @@ const src = fs.readFileSync('local-ide.src.html', 'utf8');
 const begin = src.indexOf('    // Source-resident Tool Descriptor');
 const end = src.indexOf('    // Sync Library Indicators', begin);
 const vault = {'lib-pdfjs': {textContent:'pdf-main'}, 'lib-pdfjs-worker': {textContent:'pdf-worker'}, 'lib-jszip': {textContent:'zip'}, 'lib-picocss': {textContent:'pico-css'}, 'lib-sheetjs': {textContent:'sheet-js'}};
-const api = new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership};')({getElementById:id=>vault[id]||null});
+function apiFor(v) { return new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership};')({getElementById:id=>v[id]||null}); }
+const api = apiFor(vault);
 let failures=0; function check(name,value){console.log((value?'PASS ':'FAIL ')+name);if(!value)failures++;}
 const descriptor = `<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">{"schema":"stickshift-tool","version":"1.0","file":"{{TOOL_FILE}}","skillSlug":"{{SKILL_SLUG}}","title":"{{TOOL_TITLE}}","description":"Open a useful local demo tool.","open":{"protocol":"HTML_OPEN","tool":"{{TOOL_FILE}}"},"skill":null}</script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->`;
 const standalone = '<html><body><p>standalone</p></body></html>';
@@ -37,13 +38,25 @@ check('markdown-only PDF.js example does not request a PDF.js triplet', !api.com
 let unknownError=''; try { api.compileAppSource('<html><body><script id="lib-sheets-stem"></script></body></html>',{fileName:'bad.html'}); } catch (error) { unknownError=String(error.message); }
 check('unknown active library stem reports its exact ID', unknownError.includes('lib-sheets-stem'));
 const fixture=fs.readFileSync('failing-code/Parser-tool.html','utf8');
-const fixtureCompiled=api.compileAppSource(fixture,{fileName:'Parser-tool.html'}).html;
 function count(text, needle) { return text.split(needle).length-1; }
+function extractVaultPayload(html,id) { const match=html.match(new RegExp(`<(?:(script|style))\\b(?=[^>]*\\bid=["']${id}["'])[^>]*>([\\s\\S]*?)<\\/\\1>`,'i')); if(!match)throw new Error('Missing generated vault payload: '+id); return match[2]; }
+const built=fs.readFileSync('local-ide.html','utf8');
+const realVault={}; for(const id of ['lib-picocss','lib-pdfjs','lib-pdfjs-worker','lib-sheetjs'])realVault[id]={textContent:extractVaultPayload(built,id)};
+const realApi=apiFor(realVault), fixtureCompiled=realApi.compileAppSource(fixture,{fileName:'Parser-tool.html'}).html;
+check('parser fixture uses the real generated Pico/PDF.js/SheetJS vault payloads', realVault['lib-sheetjs'].textContent.length>100000&&realVault['lib-pdfjs'].textContent.length>100000&&realVault['lib-pdfjs-worker'].textContent.length>100000);
 check('parser fixture packs Pico.css exactly once', count(fixtureCompiled,'id="injected-lib-picocss"')===1);
 check('parser fixture packs PDF.js main, worker, and setup exactly once', count(fixtureCompiled,'id="injected-lib-pdfjs"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-worker"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-setup"')===1);
 check('parser fixture packs SheetJS exactly once and leaves no active stems', count(fixtureCompiled,'id="injected-lib-sheetjs"')===1&&!/id=["']lib-(?:picocss|pdfjs|sheetjs)-stem["']/i.test(fixtureCompiled));
-check('parser fixture preserves regex-heavy application source', fixtureCompiled.includes('TSA-##-#####-##') && fixtureCompiled.includes('pdfjsLib.getDocument'));
+check('parser fixture keeps complete executable parser behavior', fixtureCompiled.includes('pdfjsLib.getDocument')&&fixtureCompiled.includes('XLSX.utils.book_new')&&fixtureCompiled.includes('els.parseBtn.addEventListener("click", parseSelectedFiles)'));
+const renderedText=fixtureCompiled.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+check('parser fixture does not leak executable source into document text', !renderedText.includes('pdfjsLib.getDocument')&&!renderedText.includes('XLSX.utils.book_new'));
 check('empty authored PDF worker assignment is removed only from compiled output', !fixtureCompiled.includes('workerSrc = ""') && fixture.includes('workerSrc = ""'));
+check('parser fixture retains compiler-owned Blob PDF worker setup', fixtureCompiled.includes('new Blob')&&fixtureCompiled.includes('URL.createObjectURL')&&fixtureCompiled.includes('injected-lib-pdfjs-setup'));
+const hostilePayload=['const token1 = "$&";','const token2 = "$1";','const token3 = "$2";','const token4 = "$`";',"const token5 = \"$'\";",'const token6 = "$$";'].join('\n');
+const hostileVault={...vault,'lib-sheetjs':{textContent:hostilePayload},'lib-picocss':{textContent:'/* $& $1 $2 $` $\' $$ */'}};
+const hostileApi=apiFor(hostileVault), hostileCompiled=hostileApi.compileAppSource('<link rel="stylesheet" id="lib-picocss-stem"><script id="lib-sheetjs-stem"></script>',{fileName:'hostile.html'}).html;
+check('hostile replacement payload is literal for JS and CSS stems', hostileCompiled.includes(hostilePayload)&&hostileCompiled.includes('/* $& $1 $2 $` $\' $$ */'));
+check('hostile replacement payload creates one wrapper and no active SheetJS stem', count(hostileCompiled,'id="injected-lib-sheetjs"')===1&&!/id=["']lib-sheetjs-stem["']/i.test(hostileCompiled));
 let workerError=''; try { api.compileAppSource('<script id="lib-pdfjs-stem"></script><script>pdfjsLib.GlobalWorkerOptions.workerSrc = "worker.js";</script>',{fileName:'bad.html'}); } catch(error) { workerError=String(error.message); }
 check('non-empty authored PDF worker assignment is rejected', workerError.includes('PDF.js worker configuration is compiler-owned.'));
 let vaultError=''; try { api.packLibraries('<script id="lib-docx-stem"></script>'); } catch(error) { vaultError=String(error.message); }
