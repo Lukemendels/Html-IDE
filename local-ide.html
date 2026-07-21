@@ -3770,6 +3770,8 @@ Prism.languages.js = Prism.languages.javascript;
     });
 
     // Source-resident Tool Descriptor and optional Tool Skill helpers.
+    const SCRIPT_CLOSE_PREFIX = '<' + '/script';
+    const SCRIPT_CLOSE_TAG = SCRIPT_CLOSE_PREFIX + '>';
     // state.code is the only canonical editable representation.
     const TOOL_SKILL_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-skill["'])[^>]*>([\s\S]*?)<\/script>/gi;
     const TOOL_DESCRIPTOR_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-descriptor["'])[^>]*>([\s\S]*?)<\/script>/gi;
@@ -3817,7 +3819,7 @@ Prism.languages.js = Prism.languages.javascript;
     function normalizeAuthoredToolSkill(html, fileName) { return substituteIntegrationPlaceholders(html, fileName); }
     function unpackInlinedLibraries(html) {
       let cleaned=html.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>[\s\S]*?<\/script>/gi,'');
-      cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem"></script>`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
+      cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem">${SCRIPT_CLOSE_TAG}`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
       const compat=cleaned.match(/<!-- STICKSHIFT_COMPATIBILITY_START -->[\s\S]*?<!-- STICKSHIFT_COMPATIBILITY_END -->/i);
       if (compat) {
         const payload=compat[0], identity=payload.match(/const\s+STICKSHIFT_TOOL\s*=\s*\{\s*file:\s*"([^"]+)",\s*skillSlug:\s*"([^"]+)",\s*title:\s*"([^"]+)"/), skill=payload.match(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*data-skill-kind="([^"]+)")[^>]*>([\s\S]*?)<\/script>/i);
@@ -3851,10 +3853,11 @@ Prism.languages.js = Prism.languages.javascript;
       } return html;
     }
     function escapeInlineScriptBreakouts(html) {
+      const closePrefix = '<' + '/script', closeTag = closePrefix + '>';
       let output='', cursor=0, openRe=/<script\b[^>]*>/gi, m;
       while ((m=openRe.exec(html))) { output+=html.slice(cursor,m.index)+m[0]; let i=openRe.lastIndex;
-        if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf('</script>',i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
-        let mode=null; for(;i<html.length;i++){const c=html[i],n=html[i+1], close=html.slice(i,i+8).toLowerCase()==='</script'; if(close&&mode===null)break; if(close){output+='<\\/script';i+=7;continue;} output+=c; if(!mode){if(c==='"'||c==="'"||c==='`')mode=c;else if(c==='/'&&n==='/'){mode='L';output+=n;i++;}else if(c==='/'&&n==='*'){mode='B';output+=n;i++;}}else if(mode==='L'&&c==='\n')mode=null;else if(mode==='B'&&c==='*'&&n==='/'){output+=n;i++;mode=null;}else if(c==='\\') {output+=n||'';i++;} else if(c===mode)mode=null;}
+        if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf(closeTag,i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
+        let mode=null; for(;i<html.length;i++){const c=html[i],n=html[i+1], close=html.slice(i,i+closePrefix.length).toLowerCase()===closePrefix; if(close&&mode===null)break; if(close){output+='<\\/script';i+=7;continue;} output+=c; if(!mode){if(c==='"'||c==="'"||c==='`')mode=c;else if(c==='/'&&n==='/'){mode='L';output+=n;i++;}else if(c==='/'&&n==='*'){mode='B';output+=n;i++;}}else if(mode==='L'&&c==='\n')mode=null;else if(mode==='B'&&c==='*'&&n==='/'){output+=n;i++;mode=null;}else if(c==='\\') {output+=n||'';i++;} else if(c===mode)mode=null;}
         const closeEnd=html.indexOf('>',i); if(i<html.length&&closeEnd>=0){output+=html.slice(i,closeEnd+1);cursor=closeEnd+1;openRe.lastIndex=cursor;}else{cursor=i;break;}
       } return output+html.slice(cursor);
     }
@@ -3888,11 +3891,11 @@ Prism.languages.js = Prism.languages.javascript;
       const skill=legacySkillMarkdown(d,identity,authored);
       const kind=authored?'authored':'registration';
       const payload=`<!-- STICKSHIFT_COMPATIBILITY_START -->
-<script>const STICKSHIFT_TOOL = { file: ${JSON.stringify(identity.file)}, skillSlug: ${JSON.stringify(d.skillSlug)}, title: ${JSON.stringify(d.title)} };</script>
-<script type="text/markdown" id="stickshift-skill" data-skill-slug="${d.skillSlug}" data-skill-kind="${kind}">${skill.replace(/<\/script/gi,'<\\/script')}</script>
+<script>const STICKSHIFT_TOOL = { file: ${JSON.stringify(identity.file)}, skillSlug: ${JSON.stringify(d.skillSlug)}, title: ${JSON.stringify(d.title)} };${SCRIPT_CLOSE_TAG}
+<script type="text/markdown" id="stickshift-skill" data-skill-slug="${d.skillSlug}" data-skill-kind="${kind}">${skill.replace(/<\/script/gi,'<\\/script')}${SCRIPT_CLOSE_TAG}
 <button id="ss-trigger" type="button">Set up with StickShift</button>
 <div id="ss-panel" hidden aria-label="StickShift onboarding"><p>StickShift setup - this tool also works standalone.</p><p>Are you using StickShift?</p><button id="ss-answer-yes" type="button">Yes</button><button id="ss-answer-no" type="button">No</button><section id="ss-yes-branch" hidden>In StickShift, click Install HTML Tool and choose this file. <button id="ss-copy-skill">Copy Skill</button></section><section id="ss-no-branch" hidden>StickShift is optional. Use this file standalone immediately and reopen setup later.</section><pre id="ss-copy-manual" hidden></pre></div>
-<script>(function(){function legacyCopy(text){return new Promise(function(resolve,reject){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();try{var copied=document.execCommand('copy');document.body.removeChild(ta);if(copied)resolve();else reject(new Error('Copy command failed.'));}catch(error){document.body.removeChild(ta);reject(error);}})}function copyText(text){if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(text).catch(function(){return legacyCopy(text)});return legacyCopy(text)}document.getElementById('ss-trigger').addEventListener('click',function(){document.getElementById('ss-panel').hidden=false});document.getElementById('ss-answer-yes').addEventListener('click',function(){document.getElementById('ss-yes-branch').hidden=false;document.getElementById('ss-no-branch').hidden=true});document.getElementById('ss-answer-no').addEventListener('click',function(){document.getElementById('ss-no-branch').hidden=false;document.getElementById('ss-yes-branch').hidden=true});document.getElementById('ss-copy-skill').addEventListener('click',function(){var text=document.getElementById('stickshift-skill').textContent;copyText(text).catch(function(){var manual=document.getElementById('ss-copy-manual');manual.hidden=false;manual.textContent=text;alert('Copy failed. Select and copy the skill text shown.');});});})();</script>
+<script>(function(){function legacyCopy(text){return new Promise(function(resolve,reject){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();try{var copied=document.execCommand('copy');document.body.removeChild(ta);if(copied)resolve();else reject(new Error('Copy command failed.'));}catch(error){document.body.removeChild(ta);reject(error);}})}function copyText(text){if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(text).catch(function(){return legacyCopy(text)});return legacyCopy(text)}document.getElementById('ss-trigger').addEventListener('click',function(){document.getElementById('ss-panel').hidden=false});document.getElementById('ss-answer-yes').addEventListener('click',function(){document.getElementById('ss-yes-branch').hidden=false;document.getElementById('ss-no-branch').hidden=true});document.getElementById('ss-answer-no').addEventListener('click',function(){document.getElementById('ss-no-branch').hidden=false;document.getElementById('ss-yes-branch').hidden=true});document.getElementById('ss-copy-skill').addEventListener('click',function(){var text=document.getElementById('stickshift-skill').textContent;copyText(text).catch(function(){var manual=document.getElementById('ss-copy-manual');manual.hidden=false;manual.textContent=text;alert('Copy failed. Select and copy the skill text shown.');});});})();${SCRIPT_CLOSE_TAG}
 <!-- STICKSHIFT_COMPATIBILITY_END -->`;
       const at=documentEndIndex(html); return html.slice(0,at)+payload+html.slice(at);
     }
