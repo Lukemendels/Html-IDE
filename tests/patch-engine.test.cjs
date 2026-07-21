@@ -26,6 +26,13 @@ async function reject(label, promise, pattern) { await assert.rejects(promise, p
   report = await engine.preflightPatchPacket(await packet(regionSource, [{ id: 'region', operation: 'replace_region', matching: { strategy: 'exact', expectedMatches: 1, region: 'hero' }, replacement: 'new' }]), regionSource);
   assert.equal(report.output, '<!-- HTML_IDE_REGION:hero:start -->new<!-- HTML_IDE_REGION:hero:end -->', 'replace_region');
 
+  const fencedJson = '```json\n' + await packet(source, [p('fenced-json', 'replace', '<h1>Title</h1>', '<h1>Fenced</h1>')]) + '\n```';
+  report = await engine.preflightPatchPacket(fencedJson, source);
+  assert(report.output.includes('Fenced'), 'fenced JSON packet');
+  const fencedLegacy = '```\nSEARCH:\n<button>Save</button>\nREPLACE:\n<button>Fenced</button>\n```';
+  report = await engine.preflightPatchPacket(fencedLegacy, source);
+  assert(report.packet.legacy && report.output.includes('Fenced'), 'fenced legacy packet');
+
   await reject('malformed JSON', engine.preflightPatchPacket('{bad', source), /Malformed JSON/);
   await reject('unsupported protocol', engine.preflightPatchPacket(JSON.stringify({ protocol: 'other', version: '2.0' }), source), /Unsupported patch protocol/);
   await reject('unsupported version', engine.preflightPatchPacket(JSON.stringify({ protocol: 'html-ide-patch', version: '3.0' }), source), /Unsupported html-ide-patch version/);
