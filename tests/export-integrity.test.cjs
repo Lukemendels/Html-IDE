@@ -15,6 +15,7 @@ assert(built.includes('window.HtmlIdePatchEngine') || built.includes('root.HtmlI
 assert(built.includes('function unwrapFencedHtmlDocument'), 'production artifact includes fenced-document unwrapping');
 assert.equal((built.match(/function normalizeToolSkillScriptBreakouts/g) || []).length, 1, 'production artifact has one Tool Skill breakout normalizer');
 assert(built.includes('stripCodeFences, parseLegacySearchReplace'), 'inlined patch engine exports stripCodeFences');
+assert(built.includes('function inspectCodeFenceEnvelope'), 'inlined patch engine contains shared fence-envelope validation');
 
 function extractFunction(name) {
   const idx = src.indexOf('function ' + name + '(');

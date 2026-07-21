@@ -18,8 +18,36 @@
   async function sourceHash(source) { return 'sha256:' + await sha256Hex(source); }
   function lineFromIndex(text, idx) { return text.slice(0, idx).split('\n').length; }
 
-  function parseLegacySearchReplace(packetText) {
-    const lines = normalizeNewlines(stripCodeFences(packetText)).split('\n');
+  const FENCE_ENVELOPE_ERROR = 'Patch input must contain either an unfenced packet or exactly one complete fenced packet with no commentary outside the fence.';
+
+  // Classify only outer packet fences. Backticks after an unfenced SEARCH: header are replacement bytes.
+  function inspectCodeFenceEnvelope(text) {
+    const original = String(text || '').replace(/^\uFEFF/, '');
+    const first = original.match(/^\s*/)[0].length;
+    const rest = original.slice(first);
+    if (/^SEARCH:/.test(rest)) {
+      if (/(?:^|\r?\n)```[\t ]*(?:\r?\n|$)/.test(rest)) return { kind: 'malformed-fence-envelope' };
+      return { kind: 'unfenced', payload: original };
+    }
+    if (/^\{/.test(rest)) return { kind: 'unfenced', payload: original };
+    if (rest.startsWith('```')) {
+      const match = rest.match(/^```(?:json|html)?[\t ]*\r?\n([\s\S]*?)\r?\n```[\t ]*\s*$/i);
+      if (!match || /(?:^|\r?\n)```(?:json|html)?[\t ]*(?=\r?\n|$)/i.test(match[1])) return { kind: 'malformed-fence-envelope' };
+      return { kind: 'single-complete-fence', payload: match[1] };
+    }
+    // A fence elsewhere is an attempted envelope preceded by commentary, not a packet body.
+    if (/(?:^|\r?\n)```(?:json|html)?[\t ]*(?:\r?\n|$)/i.test(original) || /(?:^|\r?\n)```[\t ]*(?:\r?\n|$)/.test(original)) return { kind: 'malformed-fence-envelope' };
+    return { kind: 'unfenced', payload: original };
+  }
+
+  function unwrapValidatedPacketEnvelope(text) {
+    const envelope = inspectCodeFenceEnvelope(text);
+    if (envelope.kind === 'malformed-fence-envelope') throw new Error(FENCE_ENVELOPE_ERROR);
+    return envelope.payload;
+  }
+
+  function parseLegacySearchReplaceBody(packetText) {
+    const lines = normalizeNewlines(packetText).split('\n');
     let blocks = [], currentBlock = null, stateMode = 'IDLE';
     for (const line of lines) {
       const trimmed = line.trim();
@@ -39,17 +67,20 @@
     return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
   }
 
-  // Strip only one complete Markdown fence. Commentary or multiple fences remain input and are rejected by the packet parser.
+  function parseLegacySearchReplace(packetText) {
+    return parseLegacySearchReplaceBody(unwrapValidatedPacketEnvelope(packetText));
+  }
+
+  // Public compatibility helper: unwraps only one complete supported packet fence.
   function stripCodeFences(text) {
-    const original = String(text || '');
-    const match = original.match(/^\s*```(?:json|html)?[\t ]*\r?\n([\s\S]*?)\r?\n```[\t ]*\s*$/i);
-    return match ? match[1] : original;
+    const envelope = inspectCodeFenceEnvelope(text);
+    return envelope.kind === 'single-complete-fence' ? envelope.payload : String(text || '');
   }
 
   function parsePatchPacket(packetText) {
-    packetText = stripCodeFences(packetText);
+    packetText = unwrapValidatedPacketEnvelope(packetText);
     const trimmed = String(packetText || '').trim();
-    if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
+    if (!trimmed.startsWith('{')) return parseLegacySearchReplaceBody(packetText);
     let parsed;
     try { parsed = JSON.parse(trimmed); } catch (e) { throw new Error('Malformed JSON patch packet: ' + e.message); }
     if (parsed.protocol !== 'html-ide-patch') throw new Error('Unsupported patch protocol: ' + (parsed.protocol || '(missing)'));
@@ -190,5 +221,5 @@
     };
   }
 
-  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, stripCodeFences, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
+  return { PATCH_HISTORY_LIMIT, normalizeNewlines, sha256Hex, sourceHash, lineFromIndex, inspectCodeFenceEnvelope, stripCodeFences, parseLegacySearchReplace, parsePatchPacket, findExactMatches, resolvePatch, applyResolved, preflightPatchPacket, summarizePreflight, createHistory };
 });
