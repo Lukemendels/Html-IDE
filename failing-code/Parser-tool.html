@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TSOC Narrative Report Metrics Parser</title>
+  <link rel="stylesheet" id="lib-picocss-stem">
+  <script id="lib-pdfjs-stem"></script>
+  <script id="lib-sheetjs-stem"></script>
+  <style>
+    :root {
+      --spacing: 0.85rem;
+      --font-size: 15px;
+    }
+
+    body {
+      padding: 1rem;
+    }
+
+    header {
+      margin-bottom: 1rem;
+    }
+
+    .grid-tight {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+      align-items: end;
+    }
+
+    .panel {
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      background: var(--card-background-color);
+      margin-bottom: 1rem;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--muted-border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: 0.15s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background: rgba(0, 120, 212, 0.08);
+    }
+
+    .small {
+      font-size: 0.85rem;
+      color: var(--muted-color);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 62vh;
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+    }
+
+    table {
+      white-space: nowrap;
+      font-size: 0.85rem;
+      margin: 0;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--card-background-color);
+    }
+
+    td, th {
+      padding: 0.42rem 0.55rem;
+    }
+
+    .status {
+      min-height: 1.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .ok {
+      color: #2e7d32;
+    }
+
+    .warn {
+      color: #b26a00;
+    }
+
+    .err {
+      color: #b00020;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border: 1px solid var(--muted-border-color);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      margin: 0.1rem;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar > div {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    details {
+      margin-top: 0.75rem;
+    }
+
+    textarea {
+      min-height: 160px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.82rem;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid">
+    <header>
+      <h2>TSOC Narrative Report Metrics Parser</h2>
+      <p class="small">
+        Upload one or more TSOC Narrative PDF reports. The tool extracts Table of Contents category counts, report date, report-level totals, and validation flags, then previews and exports one consolidated XLSX workbook.
+      </p>
+    </header>
+
+    <section class="panel">
+      <div class="grid-tight">
+        <div>
+          <label for="fileInput">PDF reports</label>
+          <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple>
+        </div>
+        <div>
+          <label for="outputMode">Output rows</label>
+          <select id="outputMode">
+            <option value="wide" selected>One row per report, categories as columns</option>
+            <option value="long">One row per report/category</option>
+            <option value="incidents">One row per incident, parsed fields</option>
+          </select>
+        </div>
+        <div>
+          <label for="dedupeMode">Incident duplicate handling</label>
+          <select id="dedupeMode">
+            <option value="excludeDuplicates" selected>Exclude repeated Significant Activity duplicates</option>
+            <option value="includeAll">Include all incident appearances</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop PDF files here or click to choose files">
+        <strong>Drop PDFs here</strong>
+        <span class="small">or use the file picker above</span>
+      </div>
+
+      <div class="toolbar" style="margin-top: 0.75rem;">
+        <div>
+          <button id="parseBtn">Parse PDFs</button>
+          <button id="downloadBtn" class="secondary" disabled>Download XLSX</button>
+          <button id="clearBtn" class="contrast">Clear</button>
+        </div>
+        <div id="summaryPills"></div>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <details>
+        <summary>Optional: category list and regex notes</summary>
+        <p class="small">
+          The parser reads the Table of Contents lines matching <span class="mono">Category Name (count)</span>. It then cross-checks extracted report sections and incident IDs matching <span class="mono">TSA-##-#####-##</span>. Duplicate IDs commonly appear in Significant Activity and their primary category section.
+        </p>
+        <textarea id="categoryList" spellcheck="false"></textarea>
+      </details>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <div>
+          <strong>Preview</strong>
+          <span id="rowCount" class="small">0 rows</span>
+        </div>
+        <div>
+          <input id="filterInput" type="search" placeholder="Filter preview">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="previewTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <details>
+        <summary>Parse log</summary>
+        <pre id="log" class="small"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_CATEGORIES = [
+      "Significant Activity",
+      "Checkpoint Closure",
+      "Procedural Error",
+      "Selectee",
+      "Firearm(s) at Checkpoint",
+      "Evacuation/Closure",
+      "Access Control",
+      "Unmanned Aircraft System (UAS)",
+      "Perimeter Area Breach",
+      "Unsecured Door",
+      "Threat",
+      "Disruptive Passenger/Individual",
+      "Inflight Disturbance",
+      "Equipment Malfunction",
+      "ETD / CTX Alarm",
+      "No-Fly List Match",
+      "TDC Referral",
+      "Advanced Imaging Technology (AIT)",
+      "Artfully Concealed Prohibited Item",
+      "Prohibited Item at Checkpoint",
+      "Prohibited Item in Sterile Area",
+      "Prohibited Item on Aircraft",
+      "Suspected IED",
+      "Suspicious Individual(s) / Event",
+      "Theft",
+      "Unattended Bag",
+      "Bulk Currency",
+      "Contraband",
+      "Miscellaneous",
+      "Surface",
+      "Mass Transit",
+      "HMC",
+      "Maritime",
+      "Freight Rail",
+      "Passenger Rail",
+      "Pipeline",
+      "Postal - Shipping"
+    ];
+
+    const state = {
+      files: [],
+      parsedReports: [],
+      currentRows: [],
+      currentColumns: []
+    };
+
+    const els = {
+      fileInput: document.getElementById("fileInput"),
+      dropzone: document.getElementById("dropzone"),
+      parseBtn: document.getElementById("parseBtn"),
+      downloadBtn: document.getElementById("downloadBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      outputMode: document.getElementById("outputMode"),
+      dedupeMode: document.getElementById("dedupeMode"),
+      status: document.getElementById("status"),
+      summaryPills: document.getElementById("summaryPills"),
+      categoryList: document.getElementById("categoryList"),
+      previewTable: document.getElementById("previewTable"),
+      rowCount: document.getElementById("rowCount"),
+      filterInput: document.getElementById("filterInput"),
+      log: document.getElementById("log")
+    };
+
+    els.categoryList.value = DEFAULT_CATEGORIES.join("\n");
+
+    if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+    }
+
+    function setStatus(message, kind = "") {
+      els.status.className = "status " + kind;
+      els.status.textContent = message;
+    }
+
+    function log(message) {
+      const stamp = new Date().toLocaleTimeString();
+      els.log.textContent += "[" + stamp + "] " + message + "\n";
+    }
+
+    function getCategories() {
+      return els.categoryList.value
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function escapeRegex(s) {
+      return s.replace(/[.*+?^${}()|[\\]\\\]/g, "\\\$&");
+    }
+
+    function normalizeText(text) {
+      return text
+        .replace(/\r/g, "\n")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\u00a0/g, " ")
+        .replace(/[·•]/g, ".")
+        .replace(/\n{3,}/g, "\n\n");
+    }
+
+    function normalizeCategoryName(s) {
+      return (s || "")
+        .replace(/\\.+$/g, "")
+        .replace(/\\s+/g, " ")
+        .trim();
+    }
+
+    function extractReportDate(text, filename) {
+      const titleDate = text.match(/TSOC Narratives \\(All\\)\\s+([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})/i);
+      if (titleDate) return titleDate[1];
+
+      const fileDate = filename.match(/(20\\d{2})(\\d{2})(\\d{2})/);
+      if (fileDate) {
+        const d = new Date(Number(fileDate[1]), Number(fileDate[2]) - 1, Number(fileDate[3]));
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      }
+
+      const slashDate = text.match(/\b(\\d{2}\/\\d{2}\/\\d{4})\b/);
+      return slashDate ? slashDate[1] : "";
+    }
+
+    function dateSortable(reportDate) {
+      const d = new Date(reportDate);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      const m = reportDate.match(/(\\d{2})\/(\\d{2})\/(\\d{4})/);
+      if (m) return `${m[3]}-${m[1]}-${m[2]}`;
+      return "";
+    }
+
+    function extractTocBlock(text) {
+      const start = text.search(/Table of Contents/i);
+      if (start < 0) return "";
+      const after = text.slice(start);
+      const end = after.search(/WARNING: This record contains Sensitive Security Information/i);
+      return end >= 0 ? after.slice(0, end) : after.slice(0, 4000);
+    }
+
+    function extractTocCounts(text, categories) {
+      const toc = extractTocBlock(text);
+      const counts = {};
+      categories.forEach(c => counts[c] = null);
+
+      const lines = toc.split(/\n/).map(line => line.trim()).filter(Boolean);
+      for (const line of lines) {
+        const cleaned = line.replace(/\\s+/g, " ").replace(/\\.+/g, ".").trim();
+        const match = cleaned.match(/^(.+?)\\s*\\((\\d+)\\)\\.?\\s*$/);
+        if (!match) continue;
+
+        const rawName = normalizeCategoryName(match[1]);
+        const count = Number(match[2]);
+
+        const exact = categories.find(c => c.toLowerCase() === rawName.toLowerCase());
+        if (exact) {
+          counts[exact] = count;
+        } else {
+          const loose = categories.find(c => normalizeCategoryName(c).toLowerCase() === rawName.toLowerCase());
+          if (loose) counts[loose] = count;
+        }
+      }
+
+      return counts;
+    }
+
+    function extractSectionSpans(text, categories) {
+      const spans = [];
+      for (const category of categories) {
+        const pattern = new RegExp("(^|\\n)" + escapeRegex(category).replace(/\\\ /g, "\\\s+") + "\\\s*\\\((\\\d+)\\\)\\\s*(?:None reported)?", "gi");
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+          spans.push({
+            category,
+            count: Number(match[2]),
+            index: match.index + (match[1] ? match[1].length : 0),
+            header: match[0].trim()
+          });
+        }
+      }
+
+      spans.sort((a, b) => a.index - b.index);
+      return spans.map((span, i) => ({
+        ...span,
+        end: i + 1 < spans.length ? spans[i + 1].index : text.length
+      }));
+    }
+
+    function classifyLocation(line) {
+      const m = line.match(/^\\s*[.\\-·]?\\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\\s+\\d{2}\/\\d{2}\/\\d{4},\\s+(.+?)\\s*$/i);
+      if (!m) return { incidentDate: "", airportCode: "", location: "" };
+      const full = m[1].trim().replace(/;.*$/, "").trim();
+      const airport = full.match(/^([A-Z0-9]{3,4})\\s*-\\s*(.+)$/);
+      if (airport) return { incidentDate: line.match(/\\d{2}\/\\d{2}\/\\d{4}/)?.[0] || "", airportCode: airport[1], location: airport[2].trim() };
+      return { incidentDate: line.match(/\\d{2}\/\\d{2}\/\\d{4}/)?.[0] || "", airportCode: "", location: full };
+    }
+
+    function parseFlight(block) {
+      const flightLine = block.match(/[.\\-·]\\s*([A-Z][A-Za-z0-9 .,&()\/'-]+?)\\s+#\\s*([A-Za-z0-9 ]+)\\s*\\(([A-Z0-9]{3,4})-([A-Z0-9]{3,4})\\)/);
+      if (!flightLine) return { carrier: "", flightNumber: "", origin: "", destination: "" };
+      return {
+        carrier: flightLine[1].trim(),
+        flightNumber: flightLine[2].trim(),
+        origin: flightLine[3].trim(),
+        destination: flightLine[4].trim()
+      };
+    }
+
+    function parsePerson(block) {
+      const personLine = block.match(/[.\\-·]\\s*((?:Passenger|Individual|Airport employee|Airline employee|Gate pass holder|Active LEO|Other aviation credentialed holder|Selectee Passenger)[^;\n]*?)(?:\\s*\\(DOB:\\s*([^)]+)\\))?;/i);
+      if (!personLine) return { subjectType: "", subjectName: "", dob: "" };
+
+      let subject = personLine[1].trim();
+      let subjectType = "";
+      const typeMatch = subject.match(/^(Passenger|Individual|Airport employee|Airline employee|Gate pass holder|Active LEO|Other aviation credentialed holder|Selectee Passenger)(?:\\s*-\\s*[^ ]+(?:\\s+[^ ]+)*)?\\s+(.+)$/i);
+      if (typeMatch) {
+        subjectType = typeMatch[1].trim();
+        subject = typeMatch[2].trim();
+      }
+
+      return {
+        subjectType,
+        subjectName: subject.replace(/\\s+/g, " ").trim(),
+        dob: personLine[2] ? personLine[2].trim() : ""
+      };
+    }
+
+    function parseIncidentDetails(block) {
+      const lines = block.split(/\n/).map(s => s.trim()).filter(Boolean);
+      const firstLine = lines[0] || "";
+      const idTitle = firstLine.match(/^(TSA-\\d{2}-\\d{5}-\\d{2})\\s+(.+)$/);
+      const id = idTitle ? idTitle[1] : "";
+      const title = idTitle ? idTitle[2].trim() : firstLine;
+      const dateLine = lines.find(line => /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\\s+\\d{2}\/\\d{2}\/\\d{4}/i.test(line)) || "";
+      const loc = classifyLocation(dateLine);
+      const flight = parseFlight(block);
+      const person = parsePerson(block);
+
+      const delay = block.match(/delayed\\s+([^.\n;]+?)(?:\\s+affecting\\s+([^.\n;]+?)(?:\\s+passengers)?)?(?:[.;\n]|$)/i);
+      const closure = block.match(/closure\\s+([^.\n;]+?)(?:[.;\n]|$)/i);
+      const firearm = block.match(/((?:Loaded|Unloaded)\\s+[^.\n;]*?firearm[^.\n;]*?)(?:;|\\.|\n)/i);
+      const prohibited = block.match(/[.\\-·]\\s*([^.\n;]*(?:stun gun|brass knuckles|baton|knife|ammunition|ammo|lighter|replica|grenade|spray|hatchet|suppressor|silencer|firearm-shaped|gun lighter)[^.\n;]*?)\\s+discovered/i);
+
+      return {
+        incidentId: id,
+        title,
+        incidentDate: loc.incidentDate,
+        airportCode: loc.airportCode,
+        location: loc.location,
+        carrier: flight.carrier,
+        flightNumber: flight.flightNumber,
+        origin: flight.origin,
+        destination: flight.destination,
+        subjectType: person.subjectType,
+        subjectName: person.subjectName,
+        dob: person.dob,
+        outcome: extractOutcome(block),
+        leoResponse: /No LEO response/i.test(block) ? "No LEO response" : (/Police|Sheriff|LEO|FBI|CBP|Airport Police/i.test(block) ? "LEO response indicated" : ""),
+        delayText: delay ? delay[1].trim() : "",
+        affectedPassengers: delay && delay[2] ? delay[2].trim() : "",
+        closureText: closure ? closure[1].trim() : "",
+        firearmText: firearm ? firearm[1].trim() : "",
+        itemText: prohibited ? prohibited[1].trim() : "",
+        cited: /\bCited\b/i.test(block) ? "Yes" : "No",
+        arrested: /\bArrested\b/i.test(block) ? "Yes" : "No",
+        detained: /\bDetained\b/i.test(block) ? "Yes" : "No",
+        blockText: block.replace(/\\s+/g, " ").trim()
+      };
+    }
+
+    function extractOutcome(block) {
+      const outcomes = [
+        "Allowed to continue",
+        "Allowed to rebook",
+        "Allowed to exit airport",
+        "Denied access",
+        "Denied boarding",
+        "Arrested",
+        "Detained",
+        "Transported to hospital",
+        "Medical hold",
+        "Not located",
+        "Deceased"
+      ];
+      const found = outcomes.filter(o => new RegExp(escapeRegex(o), "i").test(block));
+      return found.join("; ");
+    }
+
+    function extractIncidents(text, categories, filename, reportDate) {
+      const spans = extractSectionSpans(text, categories);
+      const incidents = [];
+
+      for (const span of spans) {
+        if (span.category === "Acronym List") continue;
+        const sectionText = text.slice(span.index, span.end);
+        const matches = [...sectionText.matchAll(/(^|\n)(TSA-\\d{2}-\\d{5}-\\d{2}\\s+.+?)(?=\nTSA-\\d{2}-\\d{5}-\\d{2}\\s+|\n[A-Z][A-Za-z0-9() /.,'-]+\\s+\\(\\d+\\)\\s*(?:None reported)?|\nAcronym List|\\s*$)/gs)];
+
+        for (const match of matches) {
+          const block = normalizeText(match[2]);
+          const details = parseIncidentDetails(block);
+          incidents.push({
+            sourceFile: filename,
+            reportDate,
+            reportDateSort: dateSortable(reportDate),
+            sectionCategory: span.category,
+            sectionTocCount: span.count,
+            ...details
+          });
+        }
+      }
+
+      return incidents;
+    }
+
+    async function extractPdfText(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const pages = [];
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        pages.push(strings.join(" "));
+      }
+
+      return normalizeText(pages.join("\n"));
+    }
+
+    async function parseFile(file) {
+      log("Reading " + file.name);
+      const text = await extractPdfText(file);
+      const categories = getCategories();
+      const reportDate = extractReportDate(text, file.name);
+      const counts = extractTocCounts(text, categories);
+      const incidents = extractIncidents(text, categories, file.name, reportDate);
+
+      const totalToc = Object.values(counts).reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+      const missingCategories = categories.filter(c => counts[c] === null);
+
+      const uniqueIncidentIds = new Set(incidents.map(i => i.incidentId).filter(Boolean));
+      const duplicateAppearances = incidents.length - uniqueIncidentIds.size;
+
+      const report = {
+        sourceFile: file.name,
+        reportDate,
+        reportDateSort: dateSortable(reportDate),
+        counts,
+        totalToc,
+        incidentAppearances: incidents.length,
+        uniqueIncidentIds: uniqueIncidentIds.size,
+        duplicateAppearances,
+        missingCategoryCount: missingCategories.length,
+        missingCategories: missingCategories.join("; "),
+        incidents,
+        rawTextLength: text.length
+      };
+
+      log(`Parsed ${file.name}: ${reportDate || "no date found"}, ${totalToc} TOC total, ${incidents.length} incident appearances, ${uniqueIncidentIds.size} unique IDs.`);
+      if (missingCategories.length) log(`Warning for ${file.name}: ${missingCategories.length} categories were not found in TOC.`);
+
+      return report;
+    }
+
+    function buildWideRows(reports) {
+      const categories = getCategories();
+      const rows = reports.map(report => {
+        const row = {
+          SourceFile: report.sourceFile,
+          ReportDate: report.reportDate,
+          ReportDateSort: report.reportDateSort,
+          Total_TOC_Count: report.totalToc,
+          Incident_Appearances_Parsed: report.incidentAppearances,
+          Unique_Incident_IDs_Parsed: report.uniqueIncidentIds,
+          Duplicate_Incident_Appearances: report.duplicateAppearances,
+          Missing_Category_Count: report.missingCategoryCount,
+          Missing_Categories: report.missingCategories
+        };
+
+        categories.forEach(category => {
+          row[safeHeader(category)] = report.counts[category] === null ? "" : report.counts[category];
+        });
+
+        return row;
+      });
+
+      return rows;
+    }
+
+    function buildLongRows(reports) {
+      const categories = getCategories();
+      const rows = [];
+      for (const report of reports) {
+        for (const category of categories) {
+          rows.push({
+            SourceFile: report.sourceFile,
+            ReportDate: report.reportDate,
+            ReportDateSort: report.reportDateSort,
+            Category: category,
+            TOC_Count: report.counts[category] === null ? "" : report.counts[category],
+            FoundInTOC: report.counts[category] === null ? "No" : "Yes"
+          });
+        }
+      }
+      return rows;
+    }
+
+    function buildIncidentRows(reports) {
+      const includeAll = els.dedupeMode.value === "includeAll";
+      const rows = [];
+      const seen = new Set();
+
+      for (const report of reports) {
+        for (const incident of report.incidents) {
+          const key = report.sourceFile + "|" + incident.incidentId;
+          const isDuplicate = seen.has(key);
+          if (!includeAll && isDuplicate) continue;
+          seen.add(key);
+
+          rows.push({
+            SourceFile: incident.sourceFile,
+            ReportDate: incident.reportDate,
+            ReportDateSort: incident.reportDateSort,
+            SectionCategory: incident.sectionCategory,
+            SectionTOCCount: incident.sectionTocCount,
+            IncidentID: incident.incidentId,
+            DuplicateWithinReport: isDuplicate ? "Yes" : "No",
+            Title: incident.title,
+            IncidentDate: incident.incidentDate,
+            AirportCode: incident.airportCode,
+            Location: incident.location,
+            Carrier: incident.carrier,
+            FlightNumber: incident.flightNumber,
+            Origin: incident.origin,
+            Destination: incident.destination,
+            SubjectType: incident.subjectType,
+            SubjectName: incident.subjectName,
+            DOB: incident.dob,
+            Outcome: incident.outcome,
+            LEOResponse: incident.leoResponse,
+            DelayText: incident.delayText,
+            AffectedPassengers: incident.affectedPassengers,
+            ClosureText: incident.closureText,
+            FirearmText: incident.firearmText,
+            ItemText: incident.itemText,
+            Cited: incident.cited,
+            Arrested: incident.arrested,
+            Detained: incident.detained,
+            NarrativeText: incident.blockText
+          });
+        }
+      }
+
+      return rows;
+    }
+
+    function safeHeader(category) {
+      return category
+        .replace(/\\(s\\)/g, "s")
+        .replace(/[^A-Za-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    }
+
+    function setFiles(files) {
+      state.files = [...files].filter(file => /\\.pdf$/i.test(file.name) || file.type === "application/pdf");
+      setStatus(`${state.files.length} PDF file(s) selected.`, state.files.length ? "ok" : "warn");
+      renderPills();
+    }
+
+    function renderPills() {
+      els.summaryPills.innerHTML = "";
+      const filePill = document.createElement("span");
+      filePill.className = "pill";
+      filePill.textContent = `${state.files.length} selected`;
+      els.summaryPills.appendChild(filePill);
+
+      const reportPill = document.createElement("span");
+      reportPill.className = "pill";
+      reportPill.textContent = `${state.parsedReports.length} parsed`;
+      els.summaryPills.appendChild(reportPill);
+
+      const rowPill = document.createElement("span");
+      rowPill.className = "pill";
+      rowPill.textContent = `${state.currentRows.length} rows`;
+      els.summaryPills.appendChild(rowPill);
+    }
+
+    function rebuildRows() {
+      const mode = els.outputMode.value;
+      if (mode === "wide") state.currentRows = buildWideRows(state.parsedReports);
+      if (mode === "long") state.currentRows = buildLongRows(state.parsedReports);
+      if (mode === "incidents") state.currentRows = buildIncidentRows(state.parsedReports);
+
+      const columnSet = new Set();
+      state.currentRows.forEach(row => Object.keys(row).forEach(k => columnSet.add(k)));
+      state.currentColumns = [...columnSet];
+      renderTable();
+      renderPills();
+      els.downloadBtn.disabled = state.currentRows.length === 0;
+    }
+
+    function renderTable() {
+      const filter = els.filterInput.value.trim().toLowerCase();
+      const rows = filter
+        ? state.currentRows.filter(row => Object.values(row).some(v => String(v ?? "").toLowerCase().includes(filter)))
+        : state.currentRows;
+
+      els.rowCount.textContent = `${rows.length} row(s)` + (filter ? ` filtered from ${state.currentRows.length}` : "");
+
+      const thead = els.previewTable.querySelector("thead");
+      const tbody = els.previewTable.querySelector("tbody");
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
+
+      if (!state.currentColumns.length) return;
+
+      const trHead = document.createElement("tr");
+      for (const col of state.currentColumns) {
+        const th = document.createElement("th");
+        th.textContent = col;
+        trHead.appendChild(th);
+      }
+      thead.appendChild(trHead);
+
+      const maxRows = Math.min(rows.length, 500);
+      for (let i = 0; i < maxRows; i++) {
+        const tr = document.createElement("tr");
+        for (const col of state.currentColumns) {
+          const td = document.createElement("td");
+          const val = rows[i][col] ?? "";
+          td.textContent = String(val).length > 180 ? String(val).slice(0, 180) + "..." : String(val);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+
+      if (rows.length > maxRows) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = state.currentColumns.length;
+        td.textContent = `Preview limited to first ${maxRows} rows. XLSX export includes all rows.`;
+        td.className = "small";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function parseSelectedFiles() {
+      if (!state.files.length) {
+        setStatus("Select one or more PDF files first.", "warn");
+        return;
+      }
+
+      setStatus("Parsing PDFs. Please wait...", "");
+      els.parseBtn.disabled = true;
+      els.downloadBtn.disabled = true;
+      state.parsedReports = [];
+      state.currentRows = [];
+      state.currentColumns = [];
+      els.log.textContent = "";
+
+      try {
+        for (const file of state.files) {
+          const report = await parseFile(file);
+          state.parsedReports.push(report);
+        }
+
+        state.parsedReports.sort((a, b) => (a.reportDateSort || "").localeCompare(b.reportDateSort || "") || a.sourceFile.localeCompare(b.sourceFile));
+        rebuildRows();
+        setStatus(`Parsed ${state.parsedReports.length} report(s). Preview is ready.`, "ok");
+      } catch (err) {
+        console.error(err);
+        setStatus("Parse failed: " + (err && err.message ? err.message : String(err)), "err");
+        log("ERROR: " + (err && err.stack ? err.stack : String(err)));
+      } finally {
+        els.parseBtn.disabled = false;
+      }
+    }
+
+    function downloadXlsx() {
+      if (!state.currentRows.length) {
+        setStatus("No rows to export.", "warn");
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+
+      const wsMain = XLSX.utils.json_to_sheet(state.currentRows, { header: state.currentColumns });
+      XLSX.utils.book_append_sheet(wb, wsMain, sheetName(els.outputMode.value === "wide" ? "Report Metrics" : els.outputMode.value === "long" ? "Category Metrics" : "Incidents"));
+
+      const wideRows = buildWideRows(state.parsedReports);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(wideRows), "Report Summary");
+
+      const longRows = buildLongRows(state.parsedReports);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(longRows), "Category Counts");
+
+      const incidentRowsAll = (() => {
+        const old = els.dedupeMode.value;
+        els.dedupeMode.value = "includeAll";
+        const rows = buildIncidentRows(state.parsedReports);
+        els.dedupeMode.value = old;
+        return rows;
+      })();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incidentRowsAll), "Incident Appearances");
+
+      const validationRows = state.parsedReports.map(report => ({
+        SourceFile: report.sourceFile,
+        ReportDate: report.reportDate,
+        Total_TOC_Count: report.totalToc,
+        Incident_Appearances_Parsed: report.incidentAppearances,
+        Unique_Incident_IDs_Parsed: report.uniqueIncidentIds,
+        Duplicate_Incident_Appearances: report.duplicateAppearances,
+        Missing_Category_Count: report.missingCategoryCount,
+        Missing_Categories: report.missingCategories,
+        Raw_Text_Length: report.rawTextLength
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(validationRows), "Validation");
+
+      const now = new Date();
+      const stamp = now.toISOString().slice(0, 19).replace(/[-:T]/g, "");
+      XLSX.writeFile(wb, `TSOC_Narrative_Metrics_${stamp}.xlsx`);
+      setStatus("XLSX export generated.", "ok");
+    }
+
+    function sheetName(name) {
+      return name.slice(0, 31).replace(/[\/?*[\\]:]/g, " ");
+    }
+
+    function clearAll() {
+      state.files = [];
+      state.parsedReports = [];
+      state.currentRows = [];
+      state.currentColumns = [];
+      els.fileInput.value = "";
+      els.filterInput.value = "";
+      els.log.textContent = "";
+      els.previewTable.querySelector("thead").innerHTML = "";
+      els.previewTable.querySelector("tbody").innerHTML = "";
+      els.rowCount.textContent = "0 rows";
+      els.downloadBtn.disabled = true;
+      setStatus("Cleared.", "");
+      renderPills();
+    }
+
+    els.fileInput.addEventListener("change", e => setFiles(e.target.files));
+    els.parseBtn.addEventListener("click", parseSelectedFiles);
+    els.downloadBtn.addEventListener("click", downloadXlsx);
+    els.clearBtn.addEventListener("click", clearAll);
+    els.outputMode.addEventListener("change", () => {
+      if (state.parsedReports.length) rebuildRows();
+    });
+    els.dedupeMode.addEventListener("change", () => {
+      if (state.parsedReports.length && els.outputMode.value === "incidents") rebuildRows();
+    });
+    els.filterInput.addEventListener("input", renderTable);
+
+    els.dropzone.addEventListener("click", () => els.fileInput.click());
+    els.dropzone.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        els.fileInput.click();
+      }
+    });
+    els.dropzone.addEventListener("dragover", e => {
+      e.preventDefault();
+      els.dropzone.classList.add("dragover");
+    });
+    els.dropzone.addEventListener("dragleave", () => els.dropzone.classList.remove("dragover"));
+    els.dropzone.addEventListener("drop", e => {
+      e.preventDefault();
+      els.dropzone.classList.remove("dragover");
+      setFiles(e.dataTransfer.files);
+    });
+
+    renderPills();
+    setStatus("Ready. Select or drop TSOC Narrative PDF reports.");
+  </script>
+</body>
+</html>

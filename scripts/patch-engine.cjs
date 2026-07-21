@@ -39,7 +39,10 @@
     return { protocol: 'legacy-search-replace', version: '1.0', target: {}, patches: blocks, legacy: true };
   }
 
+  function stripCodeFences(text) { const trimmed=String(text || '').trim(); const match=trimmed.match(/^```(?:json|html)?\s*\n([\s\S]*?)\n```$/i); return match ? match[1] : String(text || ''); }
+
   function parsePatchPacket(packetText) {
+    packetText = stripCodeFences(packetText);
     const trimmed = String(packetText || '').trim();
     if (!trimmed.startsWith('{')) return parseLegacySearchReplace(packetText);
     let parsed;

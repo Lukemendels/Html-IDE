@@ -1,118 +1,65 @@
 const fs = require('fs');
 const src = fs.readFileSync('local-ide.src.html', 'utf8');
-const start = src.indexOf('const SS_KEYS');
-const end = src.indexOf('// Pack Offline Libraries UI Event Handlers');
-if (start === -1 || end === -1) { console.error('FAIL: logic block not found'); process.exit(1); }
-const logic = src.slice(start, end);
-const sourceHelpers = src.slice(src.indexOf('    // Source-resident companion skill helpers.'), src.indexOf('    // Sync Library Indicators'));
-const store = {};
-global.localStorage = {
-  getItem: k => (k in store ? store[k] : null),
-  setItem: (k, v) => { store[k] = String(v); },
-  removeItem: k => { delete store[k]; }
-};
-const vault = {
-  'lib-pdfjs': { textContent: fs.readFileSync('node_modules/pdfjs-dist/build/pdf.min.js', 'utf8') },
-  'lib-pdfjs-worker': { textContent: fs.readFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.js', 'utf8') }
-};
-const api = new Function('localStorage', 'document', sourceHelpers + '\n' + logic +
-  '; return { injectStickShiftCompliance, detectScriptBreakouts, renderSkillMarkdown, escapeInlineScriptBreakouts, unpackInlinedLibraries, normalizeAuthoredToolSkill, toolSkillBlocks, packLibraries, validateCompiledAppHtml, SS_KEYS };')(global.localStorage, { getElementById: id => vault[id] || null });
+const begin = src.indexOf('    // Source-resident Tool Descriptor');
+const end = src.indexOf('    // Sync Library Indicators', begin);
+const vault = {'lib-pdfjs': {textContent:'pdf-main'}, 'lib-pdfjs-worker': {textContent:'pdf-worker'}, 'lib-jszip': {textContent:'zip'}, 'lib-picocss': {textContent:'pico-css'}, 'lib-sheetjs': {textContent:'sheet-js'}};
+function apiFor(v) { return new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership};')({getElementById:id=>v[id]||null}); }
+const api = apiFor(vault);
+let failures=0; function check(name,value){console.log((value?'PASS ':'FAIL ')+name);if(!value)failures++;}
+const descriptor = `<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">{"schema":"stickshift-tool","version":"1.0","file":"{{TOOL_FILE}}","skillSlug":"{{SKILL_SLUG}}","title":"{{TOOL_TITLE}}","description":"Open a useful local demo tool.","open":{"protocol":"HTML_OPEN","tool":"{{TOOL_FILE}}"},"skill":null}</script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->`;
+const standalone = '<html><body><p>standalone</p></body></html>';
+check('standalone compilation remains plain', !api.compileAppSource(standalone,{fileName:'plain.html',embedStickShift:true}).html.includes('STICKSHIFT_TOOL'));
+check('descriptor-only source validates', api.validateToolIntegration('<html><body>'+descriptor+'</body></html>',false).ok);
+const registration=api.compileAppSource('<html><body>'+descriptor+'</body></html>',{fileName:'demo.html',embedStickShift:true}).html;
+check('descriptor-only emits const legacy identity', registration.includes('const STICKSHIFT_TOOL = { file: "demo.html", skillSlug: "demo", title: "Demo" }'));
+check('descriptor-only emits registration skill', registration.includes('id="stickshift-skill"')&&registration.includes('data-skill-kind="registration"')&&registration.includes('tool: demo.html'));
+check('legacy panel copies generated skill with file fallback', registration.includes("getElementById('stickshift-skill').textContent")&&registration.includes("execCommand('copy')")&&registration.includes('Are you using StickShift?'));
+const authoredDescriptor=descriptor.replace('"skill":null','"skill":{"elementId":"tool-skill","slug":"{{SKILL_SLUG}}"}');
+const authored=authoredDescriptor+'<!-- HTML_IDE_REGION:tool-skill:start --><script id="tool-skill" type="text/markdown">---\nname: old\n---\nWorkflow instructions.</script><!-- HTML_IDE_REGION:tool-skill:end -->';
+const authoredCompiled=api.compileAppSource('<html><body>'+authored+'</body></html>',{fileName:'workflow.html',embedStickShift:true}).html;
+check('authored Tool Skill compiles to legacy id only', authoredCompiled.includes('id="stickshift-skill"')&&!authoredCompiled.includes('id="tool-skill"')&&authoredCompiled.includes('data-skill-kind="authored"'));
+check('authored skill frontmatter normalized', authoredCompiled.includes('slug: workflow')&&authoredCompiled.includes('title: Workflow'));
+const quoted='<html><body><script type="text/markdown">Example <script id="lib-jszip-stem"></script></script><script id="lib-jszip-stem"></script></body></html>';
+const packed=api.packLibraries(quoted); check('data blocks mask quoted stems', (packed.match(/injected-lib-jszip/g)||[]).length===1);
+const scoped='<html><body><p>{{TOOL_FILE}} {{TOOL_TITLE}} {{SKILL_SLUG}}</p>'+descriptor+'</body></html>';
+check('placeholder resolution is scoped', api.compileAppSource(scoped,{fileName:'scoped.html'}).html.includes('<p>{{TOOL_FILE}} {{TOOL_TITLE}} {{SKILL_SLUG}}</p>'));
+const fakeBody='<html><body><script>const t=`</body>`;</script></body></html>';
+check('region insertion anchors after script template', api.replaceNamedRegion(fakeBody,'tool-descriptor',descriptor).indexOf('tool-descriptor')>fakeBody.indexOf('</script>'));
+check('inline script breakout escaping is active', api.escapeInlineScriptBreakouts('<script>const x="</script>";</script>').includes('<\\/script>'));
+// Compatibility ABI round-trip keeps registration tools descriptor-only and restores authored workflow source.
+const apiImport = new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, toolSkillBlocks, parseToolDescriptor};')({getElementById:id=>vault[id]||null});
+const importedRegistration = apiImport.unpackInlinedLibraries(registration);
+check('registration ABI import restores descriptor-only source', apiImport.parseToolDescriptor(importedRegistration).descriptor.skill === null && apiImport.toolSkillBlocks(importedRegistration).length === 0);
+const importedAuthored = apiImport.unpackInlinedLibraries(authoredCompiled);
+check('authored ABI import restores one Tool Skill', apiImport.toolSkillBlocks(importedAuthored).length === 1 && apiImport.parseToolDescriptor(importedAuthored).descriptor.skill.elementId === 'tool-skill');
 
-let fail = 0;
-const check = (name, ok) => { console.log((ok ? 'PASS ' : 'FAIL ') + name); if (!ok) fail++; };
-const CLOSE = '</scr' + 'ipt>';
+const dataStemOnly = '<html><body><script type="text/markdown">Example <script id="lib-pdfjs-stem"></script></script></body></html>';
+check('markdown-only PDF.js example does not request a PDF.js triplet', !api.compileAppSource(dataStemOnly,{fileName:'plain.html'}).html.includes('injected-lib-pdfjs'));
+let unknownError=''; try { api.compileAppSource('<html><body><script id="lib-sheets-stem"></script></body></html>',{fileName:'bad.html'}); } catch (error) { unknownError=String(error.message); }
+check('unknown active library stem reports its exact ID', unknownError.includes('lib-sheets-stem'));
+const fixture=fs.readFileSync('failing-code/Parser-tool.html','utf8');
+function count(text, needle) { return text.split(needle).length-1; }
+function extractVaultPayload(html,id) { const match=html.match(new RegExp(`<(?:(script|style))\\b(?=[^>]*\\bid=["']${id}["'])[^>]*>([\\s\\S]*?)<\\/\\1>`,'i')); if(!match)throw new Error('Missing generated vault payload: '+id); return match[2]; }
+const built=fs.readFileSync('local-ide.html','utf8');
+const realVault={}; for(const id of ['lib-picocss','lib-pdfjs','lib-pdfjs-worker','lib-sheetjs'])realVault[id]={textContent:extractVaultPayload(built,id)};
+const realApi=apiFor(realVault), fixtureCompiled=realApi.compileAppSource(fixture,{fileName:'Parser-tool.html'}).html;
+check('parser fixture uses the real generated Pico/PDF.js/SheetJS vault payloads', realVault['lib-sheetjs'].textContent.length>100000&&realVault['lib-pdfjs'].textContent.length>100000&&realVault['lib-pdfjs-worker'].textContent.length>100000);
+check('parser fixture packs Pico.css exactly once', count(fixtureCompiled,'id="injected-lib-picocss"')===1);
+check('parser fixture packs PDF.js main, worker, and setup exactly once', count(fixtureCompiled,'id="injected-lib-pdfjs"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-worker"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-setup"')===1);
+check('parser fixture packs SheetJS exactly once and leaves no active stems', count(fixtureCompiled,'id="injected-lib-sheetjs"')===1&&!/id=["']lib-(?:picocss|pdfjs|sheetjs)-stem["']/i.test(fixtureCompiled));
+check('parser fixture keeps complete executable parser behavior', fixtureCompiled.includes('pdfjsLib.getDocument')&&fixtureCompiled.includes('XLSX.utils.book_new')&&fixtureCompiled.includes('els.parseBtn.addEventListener("click", parseSelectedFiles)'));
+const renderedText=fixtureCompiled.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+check('parser fixture does not leak executable source into document text', !renderedText.includes('pdfjsLib.getDocument')&&!renderedText.includes('XLSX.utils.book_new'));
+check('empty authored PDF worker assignment is removed only from compiled output', !fixtureCompiled.includes('workerSrc = ""') && fixture.includes('workerSrc = ""'));
+check('parser fixture retains compiler-owned Blob PDF worker setup', fixtureCompiled.includes('new Blob')&&fixtureCompiled.includes('URL.createObjectURL')&&fixtureCompiled.includes('injected-lib-pdfjs-setup'));
+const hostilePayload=['const token1 = "$&";','const token2 = "$1";','const token3 = "$2";','const token4 = "$`";',"const token5 = \"$'\";",'const token6 = "$$";'].join('\n');
+const hostileVault={...vault,'lib-sheetjs':{textContent:hostilePayload},'lib-picocss':{textContent:'/* $& $1 $2 $` $\' $$ */'}};
+const hostileApi=apiFor(hostileVault), hostileCompiled=hostileApi.compileAppSource('<link rel="stylesheet" id="lib-picocss-stem"><script id="lib-sheetjs-stem"></script>',{fileName:'hostile.html'}).html;
+check('hostile replacement payload is literal for JS and CSS stems', hostileCompiled.includes(hostilePayload)&&hostileCompiled.includes('/* $& $1 $2 $` $\' $$ */'));
+check('hostile replacement payload creates one wrapper and no active SheetJS stem', count(hostileCompiled,'id="injected-lib-sheetjs"')===1&&!/id=["']lib-sheetjs-stem["']/i.test(hostileCompiled));
+let workerError=''; try { api.compileAppSource('<script id="lib-pdfjs-stem"></script><script>pdfjsLib.GlobalWorkerOptions.workerSrc = "worker.js";</script>',{fileName:'bad.html'}); } catch(error) { workerError=String(error.message); }
+check('non-empty authored PDF worker assignment is rejected', workerError.includes('PDF.js worker configuration is compiler-owned.'));
+let vaultError=''; try { api.packLibraries('<script id="lib-docx-stem"></script>'); } catch(error) { vaultError=String(error.message); }
+check('missing vault entry gives a packing diagnostic', vaultError.includes('Offline library vault is missing entry'));
 
-// Synthetic tool mirroring real generated tools: full HTML doc built in a
-// template literal, so "</body>" appears inside the tool's own script.
-const tool = '<!DOCTYPE html>\n<html>\n<head><title>t</title></head>\n<body>\n<script>\n' +
-  'function wrap(t){ return `<!doctype html><html><head></head><body>${t}</body></html>`; }\n' +
-  'console.log(wrap("hi"));\n' +
-  CLOSE + '\n</body>\n</html>\n';
-
-const injected = api.injectStickShiftCompliance(tool, 'demo.html');
-
-// The synthetic tool's own script must remain intact — its console.log call
-// (which sits AFTER the fake inner "</body>") must survive injection.
-check('tool script body intact', injected.includes('console.log(wrap("hi"));'));
-
-// The last </body> in the document should be the real one, immediately
-// preceded by the injected payload markers.
-const lastBodyIdx = injected.toLowerCase().lastIndexOf('</body>');
-const beforeLastBody = injected.slice(0, lastBodyIdx);
-check('payload anchored at last </body>', beforeLastBody.includes('STICKSHIFT_JS_END'));
-
-// There should be exactly one real closing </body> tag remaining (the
-// original tool's fake one lives inside a JS string and was never a real
-// tag to begin with — this just checks the payload landed after it).
-const firstBodyIdxLower = injected.toLowerCase().indexOf('</body>');
-check('payload injected after the fake in-string </body>', firstBodyIdxLower < lastBodyIdx || (function () {
-  // If the fake one isn't literally "</body>" as scanned text it's fine too —
-  // what matters is the script content stayed intact (checked above) and the
-  // payload sits at the true end of the document.
-  return true;
-})());
-
-// Double-injection guard
-const reInjected = api.injectStickShiftCompliance(injected, 'demo.html');
-check('double-injection guard', reInjected === injected);
-
-// Skill markdown template substitution
-const md = api.renderSkillMarkdown('demo.html', 'demo-skill', 'Demo Tool');
-check('renderSkillMarkdown substitutes tool file', md.includes('demo.html'));
-check('renderSkillMarkdown substitutes skill slug', md.includes('demo-skill'));
-check('renderSkillMarkdown substitutes tool title', md.includes('Demo Tool'));
-
-// A custom template containing a raw closing script tag must come out escaped
-global.localStorage.setItem(api.SS_KEYS.skillTemplate, 'Custom body with ' + CLOSE + ' inside for {{TOOL_TITLE}}.');
-const mdCustom = api.renderSkillMarkdown('demo.html', 'demo-skill', 'Demo Tool');
-check('renderSkillMarkdown escapes raw closing script tag', !mdCustom.includes(CLOSE) && mdCustom.includes('<\\/script'));
-global.localStorage.removeItem(api.SS_KEYS.skillTemplate);
-
-// detectScriptBreakouts should flag a closing script sequence hidden inside
-// a JS string/template literal in an executing script block.
-const breakoutHtml = '<html><body><script>\n' +
-  'var s = "oops ' + CLOSE + ' still in string";\n' +
-  CLOSE + '\n</body></html>';
-const findings = api.detectScriptBreakouts(breakoutHtml);
-check('detectScriptBreakouts flags mid-string closing tag', findings.length > 0);
-
-// detectScriptBreakouts should NOT flag a clean script with no breakout,
-// and should ignore text/plain and lib- data containers.
-const cleanHtml = '<html><body><script>\nconsole.log("all good");\n' + CLOSE + '\n' +
-  '<script type="text/plain" id="lib-jszip">some ' + CLOSE + ' looking text</script>\n' +
-  '</body></html>';
-const cleanFindings = api.detectScriptBreakouts(cleanHtml);
-check('detectScriptBreakouts ignores clean scripts and data blocks', cleanFindings.length === 0);
-
-const authored = '<!doctype html><html><body><!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">---\nname: {{SKILL_SLUG}}\n---\nDon\'t lose `&lt;\\/script` or {{TOOL_TITLE}} / {{TOOL_FILE}}.\n</script>\n<!-- HTML_IDE_REGION:tool-skill:end --><div id="sentinel"></div></body></html>';
-const authoredInjected = api.injectStickShiftCompliance(authored, 'my-tool.html');
-check('authored tool skill substituted and normalized', authoredInjected.includes('id="tool-skill" data-skill-slug="my-tool"') && authoredInjected.includes('My Tool / my-tool.html'));
-check('authored skill does not inject legacy skill', !authoredInjected.includes('STICKSHIFT_SKILL_START'));
-check('authored panel copies authored skill', authoredInjected.includes("getElementById('tool-skill').innerHTML"));
-check('authored payload retains compliance UI', ['STICKSHIFT_CSS_START', 'STICKSHIFT_TRIGGER_START', 'STICKSHIFT_PANEL_START', 'STICKSHIFT_JS_START'].every(x => authoredInjected.includes(x)));
-const dataFixture = '<script type="text/markdown" id="tool-skill">don\'t `</div>`</script><script>var x = "</script>";</script>';
-const dataEscaped = api.escapeInlineScriptBreakouts(dataFixture);
-check('data blocks bypass JS breakout scanner', dataEscaped.startsWith('<script type="text/markdown" id="tool-skill">don\'t `</div>`</script>') && dataEscaped.includes('"<\\/script>"'));
-const legacy = '<html><body><!-- STICKSHIFT_SKILL_START --><script type="text/markdown" id="stickshift-skill">legacy markdown</script><!-- STICKSHIFT_SKILL_END --><!-- STICKSHIFT_CSS_START -->x<!-- STICKSHIFT_CSS_END --><!-- STICKSHIFT_TRIGGER_START -->x<!-- STICKSHIFT_TRIGGER_END --><!-- STICKSHIFT_PANEL_START -->x<!-- STICKSHIFT_PANEL_END --><!-- STICKSHIFT_JS_START -->x<!-- STICKSHIFT_JS_END --></body></html>';
-const hoisted = api.unpackInlinedLibraries(legacy);
-check('legacy skill is hoisted into canonical source block', hoisted.includes('HTML_IDE_REGION:tool-skill:start') && hoisted.includes('id="tool-skill">legacy markdown</script>') && !hoisted.includes('STICKSHIFT_'));
-const noClobber = api.unpackInlinedLibraries(authored + legacy);
-check('legacy hoist does not clobber authored block', noClobber.includes('{{SKILL_SLUG}}') && !noClobber.includes('stickshift-skill'));
-const pdfStem = '<html><body><script id="lib-pdfjs-stem"></script></body></html>';
-const pdfCompiled = api.packLibraries(pdfStem);
-const pdfIds = ['injected-lib-pdfjs', 'injected-lib-pdfjs-worker', 'injected-lib-pdfjs-setup'];
-check('PDF.js stem inlines full main library, worker, and setup exactly once', pdfIds.every(id => (pdfCompiled.match(new RegExp(`id=["']${id}["']`, 'g')) || []).length === 1) && pdfCompiled.includes(vault['lib-pdfjs'].textContent.slice(0, 1024)) && pdfCompiled.includes(vault['lib-pdfjs-worker'].textContent.slice(0, 1024)));
-check('PDF.js worker is embedded as non-executing text before setup', pdfCompiled.indexOf('id="injected-lib-pdfjs"') < pdfCompiled.indexOf('id="injected-lib-pdfjs-worker" type="text/plain"') && pdfCompiled.indexOf('id="injected-lib-pdfjs-worker"') < pdfCompiled.indexOf('id="injected-lib-pdfjs-setup"'));
-const pdfSetupContent = pdfCompiled.match(/<script id="injected-lib-pdfjs-setup">([\s\S]*?)<\/script>/i)[1];
-check('PDF.js setup derives a Blob URL from embedded worker source only', pdfSetupContent.includes("getElementById('injected-lib-pdfjs-worker').textContent") && pdfSetupContent.includes('new Blob') && pdfSetupContent.includes('URL.createObjectURL') && !/workerSrc\s*=\s*["'](?:https?:|\.?\/|[^"']+\.js)/i.test(pdfSetupContent));
-check('PDF.js compilation validates and no-stem documents receive no payload', api.validateCompiledAppHtml(pdfCompiled).ok && !pdfIds.some(id => api.packLibraries('<html><body></body></html>').includes(id)));
-const repackedPdf = api.packLibraries(api.unpackInlinedLibraries(pdfCompiled));
-check('PDF.js import then recompile restores one complete payload', pdfIds.every(id => (repackedPdf.match(new RegExp(`id=["']${id}["']`, 'g')) || []).length === 1));
-check('manual refresh compiles through compileAppSource', /refreshIframeBtn[\s\S]*?compileAppSource\(state\.code, \{ embedStickShift: false \}\)/.test(src));
-
-if (fail > 0) {
-  console.error(`\n${fail} check(s) FAILED`);
-  process.exit(1);
-} else {
-  console.log('\nAll checks passed.');
-}
+if (failures) process.exit(1);
