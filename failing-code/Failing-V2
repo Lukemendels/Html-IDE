@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TSOC PDF Incident Table Parser</title>
+  <link rel="stylesheet" id="lib-picocss-stem">
+  <script id="lib-pdfjs-stem"></script>
+  <script id="lib-sheetjs-stem"></script>
+  <style>
+    :root {
+      --spacing: 0.85rem;
+      --font-size: 15px;
+    }
+
+    body {
+      padding: 1rem;
+    }
+
+    header {
+      margin-bottom: 1rem;
+    }
+
+    .panel {
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      background: var(--card-background-color);
+      margin-bottom: 1rem;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--muted-border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      text-align: center;
+      cursor: pointer;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: 0.15s ease;
+      margin-top: 0.75rem;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background: rgba(0, 120, 212, 0.08);
+    }
+
+    .small {
+      font-size: 0.85rem;
+      color: var(--muted-color);
+    }
+
+    .status {
+      min-height: 1.5rem;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .ok {
+      color: #2e7d32;
+    }
+
+    .warn {
+      color: #b26a00;
+    }
+
+    .err {
+      color: #b00020;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar > div {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+
+    textarea, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.82rem;
+    }
+
+    textarea {
+      min-height: 160px;
+      resize: vertical;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 48vh;
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      background: var(--code-background-color, rgba(127,127,127,0.08));
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 64vh;
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+    }
+
+    table {
+      white-space: nowrap;
+      font-size: 0.84rem;
+      margin: 0;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--card-background-color);
+    }
+
+    td, th {
+      padding: 0.42rem 0.55rem;
+      vertical-align: top;
+    }
+
+    td.notes-cell {
+      white-space: pre-wrap;
+      min-width: 420px;
+      max-width: 760px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border: 1px solid var(--muted-border-color);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      margin: 0.1rem;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    details {
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="container-fluid">
+    <header>
+      <h2>TSOC PDF Incident Table Parser</h2>
+      <p class="small">
+        Upload one or more TSOC Narrative PDFs. The tool extracts PDF text, normalizes spaced incident numbers, detects incidents, and builds a table similar to:
+        <span class="mono">Category, TSOC_Number, Subject, Airport_Name, Airport_Code, Date, Notes</span>.
+      </p>
+    </header>
+
+    <section class="panel">
+      <div class="toolbar">
+        <div>
+          <label for="fileInput">PDF report(s)</label>
+          <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple>
+        </div>
+        <div>
+          <button id="parseBtn" type="button">Parse PDF(s)</button>
+          <button id="downloadBtn" type="button" class="secondary" disabled>Download XLSX</button>
+          <button id="clearBtn" type="button" class="contrast">Clear</button>
+        </div>
+      </div>
+
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop PDF files here or click to choose files">
+        <strong>Drop PDFs here</strong>
+        <span class="small">or use the file picker above</span>
+      </div>
+
+      <div id="status" class="status">Ready. Select or drop one or more PDFs.</div>
+      <div id="summaryPills"></div>
+
+      <details>
+        <summary>Expected category list</summary>
+        <p class="small">
+          These names help the parser identify section headers and clean category names. You can edit this list before parsing.
+        </p>
+        <textarea id="categoryList" spellcheck="false"></textarea>
+      </details>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <div>
+          <strong>Parsed Incident Table</strong>
+          <span id="rowCount" class="small">0 rows</span>
+        </div>
+        <div>
+          <input id="filterInput" type="search" placeholder="Filter table">
+        </div>
+      </div>
+
+      <p class="small">
+        The preview shows the CSV-style columns. The XLSX export also includes Source_File and Report_Date.
+      </p>
+
+      <div class="table-wrap">
+        <table id="incidentTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <h4>Extracted Text Preview</h4>
+        <p class="small">Shows normalized text from the most recently parsed PDF.</p>
+        <pre id="rawTextPane">No PDF text extracted yet.</pre>
+      </article>
+
+      <article class="panel">
+        <h4>Parse Log</h4>
+        <pre id="log"></pre>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const DEFAULT_CATEGORIES = [
+      "Significant Activity",
+      "Checkpoint Closure",
+      "Procedural Error",
+      "Selectee",
+      "Firearm(s) at Checkpoint",
+      "Evacuation/Closure",
+      "Access Control",
+      "Unmanned Aircraft System (UAS)",
+      "Perimeter Area Breach",
+      "Unsecured Door",
+      "Threat",
+      "Disruptive Passenger/Individual",
+      "Inflight Disturbance",
+      "Equipment Malfunction",
+      "ETD / CTX Alarm",
+      "No-Fly List Match",
+      "TDC Referral",
+      "Advanced Imaging Technology (AIT)",
+      "Artfully Concealed Prohibited Item",
+      "Prohibited Item at Checkpoint",
+      "Prohibited Item in Sterile Area",
+      "Prohibited Item on Aircraft",
+      "Suspected IED",
+      "Suspicious Individual(s) / Event",
+      "Theft",
+      "Unattended Bag",
+      "Bulk Currency",
+      "Contraband",
+      "Miscellaneous",
+      "Surface",
+      "Mass Transit",
+      "HMC",
+      "Maritime",
+      "Freight Rail",
+      "Passenger Rail",
+      "Pipeline",
+      "Postal - Shipping"
+    ];
+
+    const OUTPUT_COLUMNS = [
+      "Category",
+      "TSOC_Number",
+      "Subject",
+      "Airport_Name",
+      "Airport_Code",
+      "Date",
+      "Notes"
+    ];
+
+    const EXPORT_COLUMNS = [
+      "Source_File",
+      "Report_Date",
+      ...OUTPUT_COLUMNS
+    ];
+
+    const state = {
+      files: [],
+      rows: [],
+      lastRawText: ""
+    };
+
+    const els = {
+      fileInput: document.getElementById("fileInput"),
+      parseBtn: document.getElementById("parseBtn"),
+      downloadBtn: document.getElementById("downloadBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      dropzone: document.getElementById("dropzone"),
+      status: document.getElementById("status"),
+      summaryPills: document.getElementById("summaryPills"),
+      categoryList: document.getElementById("categoryList"),
+      rowCount: document.getElementById("rowCount"),
+      filterInput: document.getElementById("filterInput"),
+      incidentTable: document.getElementById("incidentTable"),
+      rawTextPane: document.getElementById("rawTextPane"),
+      log: document.getElementById("log")
+    };
+
+    els.categoryList.value = DEFAULT_CATEGORIES.join("\n");
+
+    if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+    }
+
+    function setStatus(message, kind = "") {
+      els.status.className = "status " + kind;
+      els.status.textContent = message;
+    }
+
+    function log(message) {
+      const stamp = new Date().toLocaleTimeString();
+      els.log.textContent += "[" + stamp + "] " + message + "\n";
+    }
+
+    function getCategories() {
+      return els.categoryList.value
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function escapeRegex(s) {
+      return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function normalizeText(text) {
+      return String(text || "")
+        .replace(/\r/g, "\n")
+        .replace(/\u00a0/g, " ")
+        .replace(/[·•]/g, ".")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\s+([,.;:])/g, "$1")
+        .replace(/([A-Za-z]+)\s+(\d{1,2})\s*,\s*(20)\s+(\d{2})/g, "$1 $2, $3$4")
+        .replace(/\bTSA\s*-\s*(\d{2})\s*-\s*(\d{5})\s*-\s*(\d{2})\b/gi, "TSA-$1-$2-$3")
+        .replace(/\bNo\s*-\s*Fly\b/gi, "No-Fly")
+        .replace(/\bcarry\s*-\s*on\b/gi, "carry-on")
+        .replace(/\n{3,}/g, "\n\n");
+    }
+
+    function compactText(text) {
+      return normalizeText(text)
+        .replace(/\n+/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .trim();
+    }
+
+    function cleanCategoryName(value) {
+      let s = String(value || "")
+        .replace(/^Category\s*:\s*/i, "")
+        .replace(/\s+/g, " ")
+        .replace(/[.;:]+$/g, "")
+        .trim();
+
+      const categories = getCategories();
+
+      const exact = categories.find(c => c.toLowerCase() === s.toLowerCase());
+      if (exact) return exact;
+
+      const normalized = s.toLowerCase().replace(/\s*-\s*/g, "-");
+      const loose = categories.find(c => c.toLowerCase().replace(/\s*-\s*/g, "-") === normalized);
+      return loose || s;
+    }
+
+    function extractReportDate(text, filename) {
+      const clean = compactText(text);
+
+      const titleDate = clean.match(/TSOC Narratives \(All\)\s+([A-Za-z]+\s+\d{1,2},\s+20\d{2})/i);
+      if (titleDate) return titleDate[1];
+
+      const fileDate = String(filename || "").match(/(20\d{2})(\d{2})(\d{2})/);
+      if (fileDate) {
+        const d = new Date(Number(fileDate[1]), Number(fileDate[2]) - 1, Number(fileDate[3]));
+        return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      }
+
+      const slashDate = clean.match(/\b(\d{2}\/\d{2}\/20\d{2})\b/);
+      return slashDate ? slashDate[1] : "";
+    }
+
+    function removeWarningBlocks(text) {
+      return String(text || "")
+        .replace(/WARNING:\s*This record contains Sensitive Security Information.*?49 CFR parts 15 and 1520\./gi, " ")
+        .replace(/Sensitive Security Information\s+TSOC Narratives \(All\)\s+[A-Za-z]+\s+\d{1,2},\s+20\d{2}\s+\(Please note that all times are provided in ET unless specified otherwise\)\.?/gi, " ");
+    }
+
+    function removeTableOfContents(text) {
+      const t = String(text || "");
+      const start = t.search(/Table of Contents/i);
+      if (start < 0) return t;
+
+      const after = t.slice(start);
+
+      const acronymTocMatch = after.match(/Acronym List\s+\.{2,}\s*\d+/i);
+      if (acronymTocMatch && typeof acronymTocMatch.index === "number") {
+        const cutEnd = start + acronymTocMatch.index + acronymTocMatch[0].length;
+        return t.slice(0, start) + " " + t.slice(cutEnd);
+      }
+
+      const bodyStart = after.search(/Significant Activity\s*\(\d+\)\s+(?:Category\s*:|TSA-\d{2}-\d{5}-\d{2})/i);
+      if (bodyStart >= 0) {
+        return t.slice(0, start) + " " + after.slice(bodyStart);
+      }
+
+      return t;
+    }
+
+    function prepareBodyText(text) {
+      return compactText(removeTableOfContents(removeWarningBlocks(text)));
+    }
+
+    async function extractPdfText(file) {
+      if (!window.pdfjsLib) {
+        throw new Error("PDF.js library did not load. Confirm the lib-pdfjs-stem is available in the IDE.");
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const pages = [];
+
+      log("PDF opened: " + file.name + ". Pages found: " + pdf.numPages);
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        pages.push(strings.join(" "));
+        log("  Page " + pageNum + ": extracted " + strings.length + " text item(s).");
+      }
+
+      return normalizeText(pages.join("\n"));
+    }
+
+    function findInlineCategoryBefore(text, startIndex, previousStartIndex) {
+      const lookStart = Math.max(previousStartIndex || 0, startIndex - 700);
+      const before = text.slice(lookStart, startIndex);
+
+      const matches = [...before.matchAll(/Category\s*:\s*([A-Za-z0-9() /,&.'-]+?)\s*$/gi)];
+      if (matches.length) {
+        return cleanCategoryName(matches[matches.length - 1][1]);
+      }
+
+      return "";
+    }
+
+    function findSectionAtPosition(text, position, categories) {
+      const lookback = text.slice(Math.max(0, position - 2000), position);
+      let best = null;
+
+      for (const category of categories) {
+        const pattern = new RegExp(escapeRegex(category).replace(/\s+/g, "\\s+") + "\\s*\\(\\s*\\d+\\s*\\)", "gi");
+        let match;
+        while ((match = pattern.exec(lookback)) !== null) {
+          if (!best || match.index > best.index) {
+            best = {
+              category,
+              index: match.index
+            };
+          }
+        }
+      }
+
+      return best ? best.category : "";
+    }
+
+    function parseLocation(block) {
+      const m = block.match(/(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s*(\d{2}\/\d{2}\/20\d{2}),\s*([A-Z0-9]{3,4})\s*-\s*([^.;]+?)(?=\s*[.;]|\s*$)/i);
+      if (m) {
+        return {
+          date: m[1].trim(),
+          airportCode: m[2].trim(),
+          airportName: m[3].trim()
+        };
+      }
+
+      const dateOnly = block.match(/\b(\d{2}\/\d{2}\/20\d{2})\b/);
+      return {
+        date: dateOnly ? dateOnly[1] : "",
+        airportCode: "",
+        airportName: ""
+      };
+    }
+
+    function cleanNotes(text) {
+      let s = String(text || "").trim();
+
+      s = s.replace(/\s+\.\s+/g, "\n• ");
+      s = s.replace(/^\.\s*/, "");
+      s = s.replace(/[ \t]+/g, " ");
+      s = s.replace(/\n\s*•\s*/g, "\n• ");
+      s = s.trim();
+
+      if (s && !s.startsWith("•")) {
+        s = "• " + s;
+      }
+
+      return s;
+    }
+
+    function parseIncidentBlock(block, category, sourceFile, reportDate) {
+      const idMatch = block.match(/\bTSA-\d{2}-\d{5}-\d{2}\b/i);
+      if (!idMatch) return null;
+
+      const tsocNumber = idMatch[0].toUpperCase();
+      const afterId = block.slice(idMatch.index + idMatch[0].length).trim();
+
+      const subjectEnd = afterId.search(/\s+\.\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s*\d{2}\/\d{2}\/20\d{2},/i);
+
+      let subject = "";
+      let remainder = "";
+
+      if (subjectEnd >= 0) {
+        subject = afterId.slice(0, subjectEnd).replace(/[.;]+$/g, "").trim();
+        remainder = afterId.slice(subjectEnd).trim();
+      } else {
+        const firstPeriod = afterId.indexOf(".");
+        if (firstPeriod >= 0) {
+          subject = afterId.slice(0, firstPeriod).replace(/[.;]+$/g, "").trim();
+          remainder = afterId.slice(firstPeriod + 1).trim();
+        } else {
+          subject = afterId.replace(/[.;]+$/g, "").trim();
+          remainder = "";
+        }
+      }
+
+      const loc = parseLocation(block);
+
+      if (loc.date && loc.airportCode && loc.airportName) {
+        const locRemove = new RegExp(
+          "^\\.?\\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\\s*" +
+          escapeRegex(loc.date) +
+          ",\\s*" +
+          escapeRegex(loc.airportCode) +
+          "\\s*-\\s*" +
+          escapeRegex(loc.airportName) +
+          "\\s*\\.?\\s*",
+          "i"
+        );
+        remainder = remainder.replace(locRemove, "");
+      }
+
+      return {
+        Source_File: sourceFile,
+        Report_Date: reportDate,
+        Category: cleanCategoryName(category),
+        TSOC_Number: tsocNumber,
+        Subject: subject,
+        Airport_Name: loc.airportName,
+        Airport_Code: loc.airportCode,
+        Date: loc.date,
+        Notes: cleanNotes(remainder)
+      };
+    }
+
+    function parseIncidentsFromText(rawText, sourceFile, reportDate) {
+      const categories = getCategories();
+      const text = prepareBodyText(rawText);
+      const idRegex = /\bTSA-\d{2}-\d{5}-\d{2}\b/gi;
+      const matches = [...text.matchAll(idRegex)];
+      const rows = [];
+
+      log("  Incident ID appearances found after normalization: " + matches.length);
+
+      for (let i = 0; i < matches.length; i++) {
+        const start = matches[i].index;
+        const previousStart = i > 0 ? matches[i - 1].index : 0;
+        let end = i + 1 < matches.length ? matches[i + 1].index : text.length;
+
+        const between = text.slice(start, end);
+        const nextCategoryInside = between.search(/\s+Category\s*:/i);
+        if (nextCategoryInside > 20) {
+          end = start + nextCategoryInside;
+        }
+
+        const block = text.slice(start, end).trim();
+
+        let category = findInlineCategoryBefore(text, start, previousStart);
+        if (!category) {
+          category = findSectionAtPosition(text, start, categories);
+        }
+
+        const row = parseIncidentBlock(block, category, sourceFile, reportDate);
+        if (row) rows.push(row);
+      }
+
+      return rows;
+    }
+
+    async function parseFile(file) {
+      log("Reading " + file.name);
+      const rawText = await extractPdfText(file);
+      state.lastRawText = rawText;
+
+      const reportDate = extractReportDate(rawText, file.name);
+      log("  Report date detected: " + (reportDate || "not found"));
+
+      const rows = parseIncidentsFromText(rawText, file.name, reportDate);
+      log("  Parsed incident rows: " + rows.length);
+
+      return rows;
+    }
+
+    function setFiles(files) {
+      const selected = [...files].filter(file => /\.pdf$/i.test(file.name) || file.type === "application/pdf");
+      state.files = selected;
+
+      if (state.files.length) {
+        setStatus(state.files.length + " PDF file(s) selected.", "ok");
+      } else {
+        setStatus("No PDF files selected.", "warn");
+      }
+
+      renderSummary();
+    }
+
+    async function parseSelectedFiles() {
+      if (!state.files.length) {
+        setStatus("Select one or more PDF files first.", "warn");
+        return;
+      }
+
+      setStatus("Parsing PDF(s). Please wait...", "");
+      els.parseBtn.disabled = true;
+      els.downloadBtn.disabled = true;
+      els.log.textContent = "";
+      state.rows = [];
+      state.lastRawText = "";
+      renderAll();
+
+      try {
+        for (const file of state.files) {
+          const rows = await parseFile(file);
+          state.rows.push(...rows);
+        }
+
+        renderAll();
+        setStatus("Parsed " + state.rows.length + " incident row(s) from " + state.files.length + " PDF file(s).", "ok");
+      } catch (err) {
+        console.error(err);
+        setStatus("Parse failed: " + (err && err.message ? err.message : String(err)), "err");
+        log("ERROR: " + (err && err.stack ? err.stack : String(err)));
+      } finally {
+        els.parseBtn.disabled = false;
+        els.downloadBtn.disabled = state.rows.length === 0;
+        renderSummary();
+      }
+    }
+
+    function renderAll() {
+      renderTable();
+      renderSummary();
+      els.rawTextPane.textContent = state.lastRawText || "No PDF text extracted yet.";
+    }
+
+    function renderTable() {
+      const filter = els.filterInput.value.trim().toLowerCase();
+      const rows = filter
+        ? state.rows.filter(row => EXPORT_COLUMNS.some(col => String(row[col] ?? "").toLowerCase().includes(filter)))
+        : state.rows;
+
+      els.rowCount.textContent = rows.length + " row(s)" + (filter ? " filtered from " + state.rows.length : "");
+
+      const thead = els.incidentTable.querySelector("thead");
+      const tbody = els.incidentTable.querySelector("tbody");
+
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
+
+      const trHead = document.createElement("tr");
+      for (const col of OUTPUT_COLUMNS) {
+        const th = document.createElement("th");
+        th.textContent = col;
+        trHead.appendChild(th);
+      }
+      thead.appendChild(trHead);
+
+      if (!rows.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = OUTPUT_COLUMNS.length;
+        td.className = "small";
+        td.textContent = state.rows.length ? "No rows match the filter." : "No parsed rows yet.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+
+      const maxRows = Math.min(rows.length, 500);
+
+      for (let i = 0; i < maxRows; i++) {
+        const tr = document.createElement("tr");
+
+        for (const col of OUTPUT_COLUMNS) {
+          const td = document.createElement("td");
+          td.textContent = rows[i][col] ?? "";
+          if (col === "Notes") td.className = "notes-cell";
+          tr.appendChild(td);
+        }
+
+        tbody.appendChild(tr);
+      }
+
+      if (rows.length > maxRows) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = OUTPUT_COLUMNS.length;
+        td.className = "small";
+        td.textContent = "Preview limited to first " + maxRows + " rows. XLSX export includes all rows.";
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderSummary() {
+      els.summaryPills.innerHTML = "";
+
+      const filePill = document.createElement("span");
+      filePill.className = "pill";
+      filePill.textContent = state.files.length + " selected";
+      els.summaryPills.appendChild(filePill);
+
+      const rowPill = document.createElement("span");
+      rowPill.className = "pill";
+      rowPill.textContent = state.rows.length + " parsed rows";
+      els.summaryPills.appendChild(rowPill);
+
+      const textPill = document.createElement("span");
+      textPill.className = "pill";
+      textPill.textContent = state.lastRawText.length + " chars in last PDF text";
+      els.summaryPills.appendChild(textPill);
+    }
+
+    function downloadXlsx() {
+      if (!state.rows.length) {
+        setStatus("No rows to export.", "warn");
+        return;
+      }
+
+      if (!window.XLSX) {
+        setStatus("SheetJS library did not load. Cannot export XLSX.", "err");
+        return;
+      }
+
+      const exportRows = state.rows.map(row => {
+        const out = {};
+        for (const col of EXPORT_COLUMNS) {
+          out[col] = row[col] ?? "";
+        }
+        return out;
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportRows, { header: EXPORT_COLUMNS });
+      XLSX.utils.book_append_sheet(wb, ws, "TSOC Incidents");
+
+      const now = new Date();
+      const stamp = now.toISOString().slice(0, 19).replace(/[-:T]/g, "");
+      XLSX.writeFile(wb, "TSOC_Incident_Table_" + stamp + ".xlsx");
+
+      setStatus("XLSX export generated.", "ok");
+    }
+
+    function clearAll() {
+      state.files = [];
+      state.rows = [];
+      state.lastRawText = "";
+
+      els.fileInput.value = "";
+      els.filterInput.value = "";
+      els.log.textContent = "";
+      els.rawTextPane.textContent = "No PDF text extracted yet.";
+      els.downloadBtn.disabled = true;
+
+      renderAll();
+      setStatus("Cleared. Select or drop one or more PDFs.", "");
+    }
+
+    els.fileInput.addEventListener("change", function(e) {
+      setFiles(e.target.files);
+    });
+
+    els.parseBtn.addEventListener("click", function() {
+      parseSelectedFiles();
+    });
+
+    els.downloadBtn.addEventListener("click", function() {
+      downloadXlsx();
+    });
+
+    els.clearBtn.addEventListener("click", function() {
+      clearAll();
+    });
+
+    els.filterInput.addEventListener("input", function() {
+      renderTable();
+    });
+
+    els.dropzone.addEventListener("click", function() {
+      els.fileInput.click();
+    });
+
+    els.dropzone.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        els.fileInput.click();
+      }
+    });
+
+    els.dropzone.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      els.dropzone.classList.add("dragover");
+    });
+
+    els.dropzone.addEventListener("dragleave", function() {
+      els.dropzone.classList.remove("dragover");
+    });
+
+    els.dropzone.addEventListener("drop", function(e) {
+      e.preventDefault();
+      els.dropzone.classList.remove("dragover");
+      setFiles(e.dataTransfer.files);
+    });
+
+    renderAll();
+    setStatus("Ready. Select or drop one or more PDFs.");
+  </script>
+</body>
+</html>
