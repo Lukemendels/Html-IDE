@@ -25,7 +25,7 @@ function extractFunction(name) {
   }
   throw new Error(`Could not extract ${name}`);
 }
-const helpers = new Function(`${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('scriptKeywordCanStartRegex')}\n${extractFunction('scriptPunctuationCanStartRegex')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)();
+const helpers = new Function('acorn', `${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)(require('acorn'));
 
 const adversarialJs = 'const a = "</script>"; const b = "</ScRiPt>"; const c = `<div></script></div>`; const d = JSON.stringify({ html: "</script>" });';
 const escapedJs = helpers.escapeScriptTextForHtml(adversarialJs);

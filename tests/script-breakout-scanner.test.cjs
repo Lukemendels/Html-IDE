@@ -9,7 +9,8 @@ function extractFunction(name) {
   for (let i = brace; i < src.length; i++) { if (src[i] === '{') depth++; else if (src[i] === '}') depth--; if (!depth) return src.slice(start, i + 1); }
   throw new Error(`unterminated ${name}`);
 }
-const escapeInlineScriptBreakouts = new Function(`${extractFunction('isDataScriptOpenTag')}\n${extractFunction('scriptKeywordCanStartRegex')}\n${extractFunction('scriptPunctuationCanStartRegex')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn escapeInlineScriptBreakouts;`)();
+const acorn = require('acorn');
+const escapeInlineScriptBreakouts = new Function('acorn', `${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn escapeInlineScriptBreakouts;`)(acorn);
 function isDataScript(openTag) { return /\btype\s*=\s*["'](?:application\/(?:json|ld\+json)|text\/(?:plain|markdown))["']/i.test(openTag); }
 function extractStructuralScripts(html) {
   const scripts = [], re = /<script\b[^>]*>/gi; let match;
@@ -122,4 +123,34 @@ for (const source of expressionValueDivisionSources) {
   assert.equal(escapeInlineScriptBreakouts(html), html, `expression value retains division: ${source}`);
   assert.equal((html.match(/<\/script>/gi) || []).length, 1, `expression value retains one structural close: ${source}`);
   compile(executableScripts(html)[0].body);
+}
+
+
+const objectPropertyDivisionSources = [
+  'const x = { a: {} / divisor };',
+  'const x = { a: { b: 1 } / divisor };',
+  'const x = { a: function () {} / divisor };',
+  'const x = { a: function named() {} / divisor };',
+  'const x = { a: class {} / divisor };',
+  'const x = { a: class Named {} / divisor };'
+];
+for (const source of objectPropertyDivisionSources) {
+  const html = `<script>${source}</script>`;
+  const normalized = escapeInlineScriptBreakouts(html);
+  assert.equal(normalized, html, `object property expression retains division: ${source}`);
+  assert.equal((normalized.match(/<\/script>/gi) || []).length, 1, `object property division retains one structural close: ${source}`);
+  assert(!normalized.includes('<\\/script>'), `object property division adds no escape: ${source}`);
+  compile(executableScripts(normalized)[0].body);
+}
+const objectPropertyRegexSources = [
+  "const x = { pattern: /['\"]/.test(value) };",
+  'const x = { pattern: /https?:\\/\\/example\\.com/i };',
+  "const x = { nested: { pattern: /[A-Za-z0-9 .,&()\\/'-]+/ } };"
+];
+for (const source of objectPropertyRegexSources) {
+  const html = `<script>${source}</script>`;
+  const normalized = escapeInlineScriptBreakouts(html);
+  assert.equal(normalized, html, `object property regex remains unchanged: ${source}`);
+  assert.equal((normalized.match(/<\/script>/gi) || []).length, 1, `object property regex retains one structural close: ${source}`);
+  compile(executableScripts(normalized)[0].body);
 }

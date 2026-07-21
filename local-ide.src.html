@@ -674,6 +674,8 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     // Inlined CodeJar and Prism JS Libraries (Offline Bundled)
     /* {{codejar_js}} */
     /* {{prism_js}} */
+    /* HTML_IDE_COMPILER_INTERNAL_ACORN */
+    /* {{acorn_js}} */
     /* {{patch_engine_js}} */
 
     // Global Application State
@@ -1125,59 +1127,30 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
         html = html.slice(0, region.start) + region.text.replace(/<\\\/script/gi, '<\\/script').replace(/<\/script/gi, '<\\/script') + html.slice(region.end);
       } return html;
     }
-    function scriptKeywordCanStartRegex(word) { return new Set(['return','throw','case','delete','void','typeof','new','yield','await','in','of','instanceof']).has(word); }
-    function scriptPunctuationCanStartRegex(c) { return c==='('||c==='['||c===String.fromCharCode(123)||c===','||c===';'||c===':'||c==='?'||c==='='||c==='+'||c==='-'||c==='*'||c==='%'||c==='!'||c==='&'||c==='|'||c==='^'||c==='~'||c==='<'||c==='>'; }
     function escapeInlineScriptBreakouts(html) {
-      const closePrefix = '<' + '/script', closeTag = closePrefix + '>';
-      let output='', cursor=0, openRe=/<script\b[^>]*>/gi, m;
-      while ((m=openRe.exec(html))) { output+=html.slice(cursor,m.index)+m[0]; let i=openRe.lastIndex;
-        if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf(closeTag,i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
-        let mode=null, canStartRegex=true, regexClass=false, pendingControl=false, functionHeader=null, pendingClassKind=null, nextBraceKind=null, statementStart=true, pendingLabel=false;
-        const parens=[], braces=[];
-        for(;i<html.length;i++){
-          const c=html[i],n=html[i+1],close=html.slice(i,i+closePrefix.length).toLowerCase()===closePrefix;
-          if(close&&mode===null)break;
-          if(close){output+='<\\/script';i+=7;continue;}
-          output+=c;
-          if(mode==='L'){if(c==='\n'||c==='\r')mode=null;continue;}
-          if(mode==='B'){if(c==='*'&&n==='/'){output+=n;i++;mode=null;}continue;}
-          if(mode==='R'){
-            if(c==='\\'){output+=n||'';i++;continue;}
-            if(c==='[')regexClass=true;
-            else if(c===']')regexClass=false;
-            else if(c==='/'&&!regexClass){while(/[a-z]/i.test(html[i+1]||'')){output+=html[++i];}mode=null;canStartRegex=false;}
-            continue;
-          }
-          if(mode){if(c==='\\'){output+=n||'';i++;}else if(c===mode){mode=null;canStartRegex=false;statementStart=false;}continue;}
-          if(/\s/.test(c))continue;
-          if(c==='"'||c==="'"||c==='`'){mode=c;continue;}
-          if(c==='/'&&n==='/'){output+=n;i++;mode='L';continue;}
-          if(c==='/'&&n==='*'){output+=n;i++;mode='B';continue;}
-          if(c==='/'&&canStartRegex&&n!=='='){mode='R';regexClass=false;nextBraceKind=null;statementStart=false;continue;}
-          if(c==='/'){if(n==='='){output+=n;i++;}canStartRegex=true;statementStart=false;continue;}
-          if(/[A-Za-z_$]/.test(c)){
-            let word=c;while(/[A-Za-z0-9_$]/.test(html[i+1]||'')){word+=html[++i];output+=word[word.length-1];}
-            if(['if','while','for','with','switch'].includes(word)){pendingControl=true;canStartRegex=true;statementStart=false;}
-            else if(word==='else'||word==='do'){nextBraceKind='statement-block';canStartRegex=true;statementStart=true;}
-            else if(word==='try'||word==='catch'||word==='finally'){nextBraceKind=word+'-block';canStartRegex=true;statementStart=false;}
-            else if(word==='async'&&statementStart&&/^\s+function\b/.test(html.slice(i+1))){canStartRegex=true;statementStart=true;}
-            else if(word==='function'){functionHeader=statementStart?'function-declaration':'function-expression';canStartRegex=true;statementStart=false;}
-            else if(word==='class'){pendingClassKind=statementStart?'class-declaration':'class-expression';canStartRegex=true;statementStart=false;}
-            else {pendingLabel=statementStart;canStartRegex=scriptKeywordCanStartRegex(word);statementStart=false;}
-            continue;
-          }
-          if(/[0-9]/.test(c)){while(/[0-9A-Za-z_.]/.test(html[i+1]||''))output+=html[++i];canStartRegex=false;statementStart=false;continue;}
-          if(c==='('){parens.push(pendingControl?'control':functionHeader||'value');pendingControl=false;functionHeader=null;canStartRegex=true;statementStart=false;continue;}
-          if(c===')'){const kind=parens.pop();if(kind==='control')nextBraceKind=nextBraceKind||'control-block';else if(kind==='function-declaration'||kind==='function-expression')nextBraceKind=kind;canStartRegex=kind==='control';statementStart=false;continue;}
-          if(c===String.fromCharCode(123)){const kind=nextBraceKind||pendingClassKind||(statementStart?'statement-block':'object');braces.push(kind);nextBraceKind=null;pendingClassKind=null;canStartRegex=true;statementStart=true;continue;}
-          if(c===String.fromCharCode(125)){const kind=braces.pop(), expression=kind==='object'||kind==='function-expression'||kind==='class-expression';canStartRegex=!expression;statementStart=!expression;continue;}
-          if(c===';'){canStartRegex=true;statementStart=true;pendingLabel=false;continue;}
-          if(c===':'){if(pendingLabel){statementStart=true;canStartRegex=true;}else canStartRegex=true;pendingLabel=false;continue;}
-          if((c==='+'||c==='-')&&n===c){output+=n;i++;canStartRegex=false;statementStart=false;continue;}
-          canStartRegex=scriptPunctuationCanStartRegex(c);
-          statementStart=false;
+      const closeRe=/<\/script\b[^>]*>/gi, openRe=/<script\b[^>]*>/gi;
+      let output='', cursor=0, scriptNumber=0, open;
+      while((open=openRe.exec(html))){
+        output+=html.slice(cursor,open.index)+open[0]; const start=openRe.lastIndex; scriptNumber+=1;
+        if(isDataScriptOpenTag(open[0])){closeRe.lastIndex=start;const dataClose=closeRe.exec(html);if(!dataClose)throw new Error('Malformed non-executing script data block.');output+=html.slice(start,dataClose.index+dataClose[0].length);cursor=dataClose.index+dataClose[0].length;openRe.lastIndex=cursor;continue;}
+        closeRe.lastIndex=start; const candidates=[]; let candidate; while((candidate=closeRe.exec(html)))candidates.push({start:candidate.index,end:candidate.index+candidate[0].length});
+        let structural=null;
+        for(const target of candidates){
+          const source=html.slice(start,target.end), masked=source.replace(closeRe,match=>' '.repeat(match.length));
+          const comments=[], tokens=[];
+          try { const tokenizer=acorn.tokenizer(masked,{ecmaVersion:'latest',sourceType:/\btype\s*=\s*["']module["']/i.test(open[0])?'module':'script',onComment:(block,text,from,to)=>comments.push([from,to])}); for(let token=tokenizer.getToken();token.type.label!=='eof';token=tokenizer.getToken())tokens.push([token.start,token.end]); }
+          catch(error){continue;}
+          const protectedAt=at=>comments.some(range=>range[0]<=at&&at<range[1])||tokens.some(range=>range[0]<=at&&at<range[1]);
+          const first=candidates.find(item=>item.start<target.end&&!protectedAt(item.start-start));
+          if(first){structural=first;break;}
         }
-        const closeEnd=html.indexOf('>',i); if(i<html.length&&closeEnd>=0){output+=html.slice(i,closeEnd+1);cursor=closeEnd+1;openRe.lastIndex=cursor;}else{cursor=i;break;}
+        if(!structural){const line=html.slice(0,start).split('\n').length;throw new Error('Cannot tokenize executable script '+scriptNumber+' near line '+line+'. Check JavaScript syntax before the closing script tag.');}
+        const body=html.slice(start,structural.start), maskedBody=body.replace(closeRe,match=>' '.repeat(match.length));
+        const comments=[], tokens=[];
+        try { const tokenizer=acorn.tokenizer(maskedBody,{ecmaVersion:'latest',sourceType:/\btype\s*=\s*["']module["']/i.test(open[0])?'module':'script',onComment:(block,text,from,to)=>comments.push([from,to])}); for(let token=tokenizer.getToken();token.type.label!=='eof';token=tokenizer.getToken())tokens.push([token.start,token.end]); }
+        catch(error){const line=html.slice(0,start).split('\n').length+(error.loc?error.loc.line-1:0);throw new Error('Cannot tokenize executable script '+scriptNumber+' near line '+line+': '+error.message);}
+        const protectedAt=at=>comments.some(range=>range[0]<=at&&at<range[1])||tokens.some(range=>range[0]<=at&&at<range[1]);
+        output+=body.replace(closeRe,(match,offset)=>protectedAt(offset)?'<\\/script'+match.slice(8):match)+html.slice(structural.start,structural.end); cursor=structural.end;openRe.lastIndex=cursor;
       } return output+html.slice(cursor);
     }
     function detectScriptBreakouts(html) { const escaped=escapeInlineScriptBreakouts(html); return escaped===html?[]:[{line:1,snippet:'literal closing-script token escaped in executable script'}]; }
