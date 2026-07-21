@@ -53,7 +53,15 @@ check('Failing-V2 fixture uses the real generated Pico/PDF.js/SheetJS vault payl
 check('Failing-V2 fixture packs Pico.css exactly once', count(fixtureCompiled,'id="injected-lib-picocss"')===1);
 check('Failing-V2 fixture packs PDF.js main, worker, and setup exactly once', count(fixtureCompiled,'id="injected-lib-pdfjs"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-worker"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-setup"')===1);
 check('Failing-V2 fixture packs SheetJS exactly once and leaves no active stems', count(fixtureCompiled,'id="injected-lib-sheetjs"')===1&&!/id=["']lib-(?:picocss|pdfjs|sheetjs)-stem["']/i.test(fixtureCompiled));
-check('Failing-V2 fixture keeps complete executable parser behavior', fixtureCompiled.includes('pdfjsLib.getDocument')&&fixtureCompiled.includes('XLSX.utils.book_new')&&fixtureCompiled.includes('els.parseBtn.addEventListener("click", parseSelectedFiles)'));
+function extractStructuralScripts(html) { const scripts=[], re=/<script\b[^>]*>/gi; let match; while((match=re.exec(html))){const closeRe=/<\/script\s*>/gi;closeRe.lastIndex=re.lastIndex;const closing=closeRe.exec(html);if(!closing)throw new Error('Unclosed structural script at '+match.index);scripts.push({open:match[0],body:html.slice(re.lastIndex,closing.index)});re.lastIndex=closing.index+closing[0].length;}return scripts; }
+function isDataScript(open) { return /\btype\s*=\s*["'](?:application\/(?:json|ld\+json)|text\/(?:plain|markdown))["']/i.test(open); }
+const fixtureExecutable=extractStructuralScripts(fixtureCompiled).filter(script=>!isDataScript(script.open));
+const parserScripts=fixtureExecutable.filter(script=>script.body.includes('parseSelectedFiles'));
+check('Failing-V2 fixture has exactly one structural executable parser script', parserScripts.length===1);
+let parserSyntax=true;try{new Function(parserScripts[0]&&parserScripts[0].body);}catch(error){parserSyntax=false;}
+check('Failing-V2 fixture parser script has valid JavaScript syntax', parserSyntax);
+check('Failing-V2 fixture retains parser listener registrations in its executable script', parserScripts.length===1&&parserScripts[0].body.includes('els.parseBtn.addEventListener("click", parseSelectedFiles)')&&parserScripts[0].body.includes('els.dropzone.addEventListener("click"')&&parserScripts[0].body.includes('els.dropzone.addEventListener("drop"'));
+check('Failing-V2 fixture keeps complete executable parser behavior', parserScripts.length===1&&parserScripts[0].body.includes('pdfjsLib.getDocument')&&parserScripts[0].body.includes('XLSX.utils.book_new'));
 const renderedText=fixtureCompiled.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
 check('Failing-V2 fixture does not leak executable source into document text', !renderedText.includes('pdfjsLib.getDocument')&&!renderedText.includes('XLSX.utils.book_new'));
 check('empty authored PDF worker assignment is removed only from compiled output', !fixtureCompiled.includes('workerSrc = ""') && fixture.includes('workerSrc = ""'));

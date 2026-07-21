@@ -40,3 +40,7 @@ Patch packets are source-hash-bound and exact-match atomic transactions. The par
 ## Regression fixtures
 
 `failing-code/Failing-V2.html` is the final parser/export regression fixture. `node test_export.cjs` compiles it against the generated Pico.css, PDF.js (including worker), and SheetJS vault payloads, verifies each payload is injected once, rejects authored PDF worker ownership, and confirms executable payloads do not leak into document text.
+
+### Executable script breakout scanner
+
+Before library packing, executable script breakout protection lexically scans JavaScript so authored closing-script sequences in strings, templates, and comments are escaped without changing the true structural closing tag. The scanner also treats regex literals (including escaped characters, character classes, and flags) separately from division operators, using preceding meaningful tokens to decide whether a slash can begin a regex. Data scripts retain their separate masking path.

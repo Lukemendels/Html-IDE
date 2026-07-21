@@ -1125,12 +1125,40 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
         html = html.slice(0, region.start) + region.text.replace(/<\\\/script/gi, '<\\/script').replace(/<\/script/gi, '<\\/script') + html.slice(region.end);
       } return html;
     }
+    function scriptKeywordCanStartRegex(word) { return new Set(['return','throw','case','delete','void','typeof','new','yield','await','in','of','instanceof']).has(word); }
+    function scriptPunctuationCanStartRegex(c) { return c==='('||c==='['||c===String.fromCharCode(123)||c===','||c===';'||c===':'||c==='?'||c==='='||c==='+'||c==='-'||c==='*'||c==='%'||c==='!'||c==='&'||c==='|'||c==='^'||c==='~'||c==='<'||c==='>'; }
     function escapeInlineScriptBreakouts(html) {
       const closePrefix = '<' + '/script', closeTag = closePrefix + '>';
       let output='', cursor=0, openRe=/<script\b[^>]*>/gi, m;
       while ((m=openRe.exec(html))) { output+=html.slice(cursor,m.index)+m[0]; let i=openRe.lastIndex;
         if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf(closeTag,i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
-        let mode=null; for(;i<html.length;i++){const c=html[i],n=html[i+1], close=html.slice(i,i+closePrefix.length).toLowerCase()===closePrefix; if(close&&mode===null)break; if(close){output+='<\\/script';i+=7;continue;} output+=c; if(!mode){if(c==='"'||c==="'"||c==='`')mode=c;else if(c==='/'&&n==='/'){mode='L';output+=n;i++;}else if(c==='/'&&n==='*'){mode='B';output+=n;i++;}}else if(mode==='L'&&c==='\n')mode=null;else if(mode==='B'&&c==='*'&&n==='/'){output+=n;i++;mode=null;}else if(c==='\\') {output+=n||'';i++;} else if(c===mode)mode=null;}
+        let mode=null, canStartRegex=true, regexClass=false;
+        for(;i<html.length;i++){
+          const c=html[i],n=html[i+1],close=html.slice(i,i+closePrefix.length).toLowerCase()===closePrefix;
+          if(close&&mode===null)break;
+          if(close){output+='<\\/script';i+=7;continue;}
+          output+=c;
+          if(mode==='L'){if(c==='\n'||c==='\r')mode=null;continue;}
+          if(mode==='B'){if(c==='*'&&n==='/'){output+=n;i++;mode=null;}continue;}
+          if(mode==='R'){
+            if(c==='\\'){output+=n||'';i++;continue;}
+            if(c==='[')regexClass=true;
+            else if(c===']')regexClass=false;
+            else if(c==='/'&&!regexClass){while(/[a-z]/i.test(html[i+1]||'')){output+=html[++i];}mode=null;canStartRegex=false;}
+            continue;
+          }
+          if(mode){if(c==='\\'){output+=n||'';i++;}else if(c===mode){mode=null;canStartRegex=false;}continue;}
+          if(/\s/.test(c))continue;
+          if(c==='"'||c==="'"||c==='`'){mode=c;continue;}
+          if(c==='/'&&n==='/'){output+=n;i++;mode='L';continue;}
+          if(c==='/'&&n==='*'){output+=n;i++;mode='B';continue;}
+          if(c==='/'&&canStartRegex&&n!=='='){mode='R';regexClass=false;continue;}
+          if(c==='/'){if(n==='='){output+=n;i++;}canStartRegex=true;continue;}
+          if(/[A-Za-z_$]/.test(c)){let word=c;while(/[A-Za-z0-9_$]/.test(html[i+1]||'')){word+=html[++i];output+=word[word.length-1];}canStartRegex=scriptKeywordCanStartRegex(word);continue;}
+          if(/[0-9]/.test(c)){while(/[0-9A-Za-z_.]/.test(html[i+1]||''))output+=html[++i];canStartRegex=false;continue;}
+          if((c==='+'||c==='-')&&n===c){output+=n;i++;canStartRegex=false;continue;}
+          canStartRegex=scriptPunctuationCanStartRegex(c);
+        }
         const closeEnd=html.indexOf('>',i); if(i<html.length&&closeEnd>=0){output+=html.slice(i,closeEnd+1);cursor=closeEnd+1;openRe.lastIndex=cursor;}else{cursor=i;break;}
       } return output+html.slice(cursor);
     }
