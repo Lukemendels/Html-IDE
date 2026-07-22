@@ -196,3 +196,8 @@ const multiScriptCases = [
   '<script>// first script</script><script type="text/html"><div>template</div></script><script>const third = 3;</script>'
 ];
 for (const source of multiScriptCases) { const normalized=escapeInlineScriptBreakouts(source); const scripts=extractStructuralScripts(normalized); assert.equal(escapeInlineScriptBreakouts(normalized), normalized); assert(scripts.length>=2); for(const script of scripts) if(!isDataScript(script.open)){if(classifyScriptOpenTag(script.open)==='module') acorn.parse(script.body,{ecmaVersion:'latest',sourceType:'module'});else compile(script.body);} assert(!scripts[0].body.includes('const second')&&!scripts[0].body.includes('const third')); }
+
+const authoredOpenScriptCases = [
+  'const example = "<script>";', "const example = '<script>';", 'const example = `<script></script>`;', 'const pattern = /<script>/;', '// Documentation example: <script>\nconst value = 1;', '/* Example markup: <script> */\nconst value = 1;'
+];
+for (const source of authoredOpenScriptCases) { const html=`<script>${source}</script>`; const normalized=escapeInlineScriptBreakouts(html); assert(normalized.includes('<script>'), `authored opening script text remains present: ${source}`); if(source.includes('</script>')) assert(normalized.includes('<\\/script>')); else assert.equal(normalized,html,`authored opening script text remains stable: ${source}`); assert.equal(executableScripts(normalized).length,1); compile(executableScripts(normalized)[0].body); assert.equal(escapeInlineScriptBreakouts(normalized),normalized); }

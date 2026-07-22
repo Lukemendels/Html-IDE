@@ -39,3 +39,43 @@ include:
 - skills/local-html-ide.md
 </HTML_OPEN>
 Copy the block above and click Open HTML Tool in StickShift.
+
+## Tool Descriptor and Optional Tool Skill
+A standalone app may contain neither block. A registered StickShift tool has a Tool Descriptor and may have one optional Tool Skill. Named regions use `<!-- HTML_IDE_REGION:name:start -->` and `<!-- HTML_IDE_REGION:name:end -->`; use `replace_region` for whole-region changes. Tool Descriptor metadata is not a skill.
+
+## Structured AI Update Packet Format
+```json
+{"protocol":"html-ide-patch","version":"2.0","target":{"sourceHash":"sha256:..."},"patches":[{"id":"change-button-label","operation":"replace","matching":{"strategy":"exact","expectedMatches":1,"search":"<button>Save</button>"},"replacement":"<button>Export</button>"}]}
+```
+
+## Detailed Patch Reliability Guidance
+### Exact Matching and Match Counts
+Inspect current source, copy every search exactly, count every exact occurrence, and set `expectedMatches` to the verified count. If a search is zero matches, do not emit it. If repeated occurrences should not all change, add stable local context until unique.
+### Stable Search Blocks and Escaping Risk
+Avoid ambiguous isolated common lines. Use a unique local mini-block with function-specific context. Regex-heavy zero-match recovery requires re-reading the source; never guess backslash counts. Prefer a named region or smaller safer anchor.
+### Canonical Runtime State and Function Risk
+Reuse canonical runtime state rather than duplicating parsers or validators. Prefer data/configuration before algorithm replacement. Complete function replacement is high risk; copy exact current text and verify occurrences.
+### Overlap, Atomicity, and Dependent Packets
+Prevent overlapping patches. For overlap recovery, combine conflicting changes or split packets. Keep atomic transactions focused and split risky work. After an accepted dependent packet, use the new source hash for the dependent packet.
+### Failure-specific Recovery
+For expected-count mismatch, add context unless every occurrence should change. For zero matches, re-read source and choose a simpler anchor. For malformed JSON validate quotes, newlines, and backslashes. For stale hashes request the current hash only after source changed.
+
+## Patch Reliability Checklist
+### Hash
+Use the current source hash and do not request a new one merely because a packet was rejected.
+### Failure Recovery
+Obtain the exact IDE failure message, identify the reported category, and re-read affected source.
+### JSON Validity
+Emit one valid JSON object with valid strings and escapes.
+### Search Text
+Copy current source exactly; do not guess whitespace or remembered text.
+### Match Counts
+Verify every `expectedMatches` count.
+### Patch Scope
+Use the smallest safe change and consider configuration first.
+### No Overlap
+No two patch ranges overlap.
+### Runtime Consistency
+Reuse canonical runtime state.
+### Atomicity
+Every patch has a verified exact match.
