@@ -3,7 +3,7 @@ const src = fs.readFileSync('local-ide.src.html', 'utf8');
 const begin = src.indexOf('    // Source-resident Tool Descriptor');
 const end = src.indexOf('    // Sync Library Indicators', begin);
 const vault = {'lib-pdfjs': {textContent:'pdf-main'}, 'lib-pdfjs-worker': {textContent:'pdf-worker'}, 'lib-jszip': {textContent:'zip'}, 'lib-picocss': {textContent:'pico-css'}, 'lib-sheetjs': {textContent:'sheet-js'}};
-function apiFor(v) { return new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership, normalizeAuthoredToolSkill};')({getElementById:id=>v[id]||null}); }
+function apiFor(v) { return new Function('document', 'acorn', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, validateToolIntegration, packLibraries, escapeInlineScriptBreakouts, findNamedRegion, replaceNamedRegion, normalizePdfJsWorkerOwnership, normalizeAuthoredToolSkill};')({getElementById:id=>v[id]||null}, require('acorn')); }
 const api = apiFor(vault);
 let failures=0; function check(name,value){console.log((value?'PASS ':'FAIL ')+name);if(!value)failures++;}
 const descriptor = `<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">{"schema":"stickshift-tool","version":"1.0","file":"{{TOOL_FILE}}","skillSlug":"{{SKILL_SLUG}}","title":"{{TOOL_TITLE}}","description":"Open a useful local demo tool.","open":{"protocol":"HTML_OPEN","tool":"{{TOOL_FILE}}"},"skill":null}</script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->`;
@@ -28,7 +28,7 @@ const fakeBody='<html><body><script>const t=`</body>`;</script></body></html>';
 check('region insertion anchors after script template', api.replaceNamedRegion(fakeBody,'tool-descriptor',descriptor).indexOf('tool-descriptor')>fakeBody.indexOf('</script>'));
 check('inline script breakout escaping is active', api.escapeInlineScriptBreakouts('<script>const x="</script>";</script>').includes('<\\/script>'));
 // Compatibility ABI round-trip keeps registration tools descriptor-only and restores authored workflow source.
-const apiImport = new Function('document', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, toolSkillBlocks, parseToolDescriptor};')({getElementById:id=>vault[id]||null});
+const apiImport = new Function('document', 'acorn', src.slice(begin, end) + '; return {compileAppSource, unpackInlinedLibraries, toolSkillBlocks, parseToolDescriptor};')({getElementById:id=>vault[id]||null}, require('acorn'));
 const importedRegistration = apiImport.unpackInlinedLibraries(registration);
 const authoredRoundTrip=apiImport.unpackInlinedLibraries(authoredCompiled);
 const authoredRecompiled=apiImport.compileAppSource(authoredRoundTrip,{fileName:'workflow.html',embedStickShift:true}).html;
@@ -53,11 +53,20 @@ check('Failing-V2 fixture uses the real generated Pico/PDF.js/SheetJS vault payl
 check('Failing-V2 fixture packs Pico.css exactly once', count(fixtureCompiled,'id="injected-lib-picocss"')===1);
 check('Failing-V2 fixture packs PDF.js main, worker, and setup exactly once', count(fixtureCompiled,'id="injected-lib-pdfjs"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-worker"')===1&&count(fixtureCompiled,'id="injected-lib-pdfjs-setup"')===1);
 check('Failing-V2 fixture packs SheetJS exactly once and leaves no active stems', count(fixtureCompiled,'id="injected-lib-sheetjs"')===1&&!/id=["']lib-(?:picocss|pdfjs|sheetjs)-stem["']/i.test(fixtureCompiled));
-check('Failing-V2 fixture keeps complete executable parser behavior', fixtureCompiled.includes('pdfjsLib.getDocument')&&fixtureCompiled.includes('XLSX.utils.book_new')&&fixtureCompiled.includes('els.parseBtn.addEventListener("click", parseSelectedFiles)'));
+function extractStructuralScripts(html) { const scripts=[], re=/<script\b[^>]*>/gi; let match; while((match=re.exec(html))){const closeRe=/<\/script\s*>/gi;closeRe.lastIndex=re.lastIndex;const closing=closeRe.exec(html);if(!closing)throw new Error('Unclosed structural script at '+match.index);scripts.push({open:match[0],body:html.slice(re.lastIndex,closing.index)});re.lastIndex=closing.index+closing[0].length;}return scripts; }
+function isDataScript(open) { return /\btype\s*=\s*["'](?:application\/(?:json|ld\+json)|text\/(?:plain|markdown))["']/i.test(open); }
+const fixtureExecutable=extractStructuralScripts(fixtureCompiled).filter(script=>!isDataScript(script.open));
+const parserScripts=fixtureExecutable.filter(script=>script.body.includes('parseSelectedFiles'));
+check('Failing-V2 fixture has exactly one structural executable parser script', parserScripts.length===1);
+let parserSyntax=true;try{new Function(parserScripts[0]&&parserScripts[0].body);}catch(error){parserSyntax=false;}
+check('Failing-V2 fixture parser script has valid JavaScript syntax', parserSyntax);
+check('Failing-V2 fixture retains parser listener registrations in its executable script', parserScripts.length===1&&parserScripts[0].body.includes('els.parseBtn.addEventListener("click", parseSelectedFiles)')&&parserScripts[0].body.includes('els.dropzone.addEventListener("click"')&&parserScripts[0].body.includes('els.dropzone.addEventListener("drop"'));
+check('Failing-V2 fixture keeps complete executable parser behavior', parserScripts.length===1&&parserScripts[0].body.includes('pdfjsLib.getDocument')&&parserScripts[0].body.includes('XLSX.utils.book_new'));
 const renderedText=fixtureCompiled.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
 check('Failing-V2 fixture does not leak executable source into document text', !renderedText.includes('pdfjsLib.getDocument')&&!renderedText.includes('XLSX.utils.book_new'));
 check('empty authored PDF worker assignment is removed only from compiled output', !fixtureCompiled.includes('workerSrc = ""') && fixture.includes('workerSrc = ""'));
 check('Failing-V2 fixture retains compiler-owned Blob PDF worker setup', fixtureCompiled.includes('new Blob')&&fixtureCompiled.includes('URL.createObjectURL')&&fixtureCompiled.includes('injected-lib-pdfjs-setup'));
+check('compiled user tools do not contain compiler-internal Acorn', !fixtureCompiled.includes('HTML_IDE_COMPILER_INTERNAL_ACORN')&&!fixtureCompiled.includes('Acorn 8.16.0'));
 const hostilePayload=['const token1 = "$&";','const token2 = "$1";','const token3 = "$2";','const token4 = "$`";',"const token5 = \"$'\";",'const token6 = "$$";'].join('\n');
 const hostileVault={...vault,'lib-sheetjs':{textContent:hostilePayload},'lib-picocss':{textContent:'/* $& $1 $2 $` $\' $$ */'}};
 const hostileApi=apiFor(hostileVault), hostileCompiled=hostileApi.compileAppSource('<link rel="stylesheet" id="lib-picocss-stem"><script id="lib-sheetjs-stem"></script>',{fileName:'hostile.html'}).html;

@@ -12,6 +12,9 @@ assert(!src.includes('cdn.tailwindcss.com'), 'template does not include default-
 assert(!src.includes('cdnjs.cloudflare.com'), 'template does not include default-app cdnjs');
 assert(!/availableLibraryStemManifest[\s\S]*<script id="lib-[^"]+-stem"><\/script>/.test(src), 'manifest must not contain raw closing script literals');
 assert(built.includes('window.HtmlIdePatchEngine') || built.includes('root.HtmlIdePatchEngine'), 'patch engine is inlined');
+assert.equal((built.match(/HTML_IDE_COMPILER_INTERNAL_ACORN/g)||[]).length, 1, 'generated IDE contains one compiler-internal Acorn marker');
+assert.equal((builtPublic.match(/HTML_IDE_COMPILER_INTERNAL_ACORN/g)||[]).length, 1, 'public generated IDE contains one compiler-internal Acorn marker');
+assert(!built.includes('{{acorn_js}}') && !builtPublic.includes('{{acorn_js}}'), 'generated IDE artifacts resolve the Acorn placeholder');
 
 function extractFunction(name) {
   const idx = src.indexOf('function ' + name + '(');
@@ -25,7 +28,7 @@ function extractFunction(name) {
   }
   throw new Error(`Could not extract ${name}`);
 }
-const helpers = new Function(`${extractFunction('isDataScriptOpenTag')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)();
+const helpers = new Function('acorn', `${extractFunction('classifyScriptOpenTag')}\n${extractFunction('escapeScriptTextForHtml')}\n${extractFunction('escapeInlineScriptBreakouts')}\nreturn { escapeScriptTextForHtml, escapeInlineScriptBreakouts };`)(require('acorn'));
 
 const adversarialJs = 'const a = "</script>"; const b = "</ScRiPt>"; const c = `<div></script></div>`; const d = JSON.stringify({ html: "</script>" });';
 const escapedJs = helpers.escapeScriptTextForHtml(adversarialJs);

@@ -674,6 +674,8 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     // Inlined CodeJar and Prism JS Libraries (Offline Bundled)
     /* {{codejar_js}} */
     /* {{prism_js}} */
+    /* HTML_IDE_COMPILER_INTERNAL_ACORN */
+    /* {{acorn_js}} */
     /* {{patch_engine_js}} */
 
     // Global Application State
@@ -1041,7 +1043,12 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
     // state.code is the only canonical editable representation.
     const TOOL_SKILL_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-skill["'])[^>]*>([\s\S]*?)<\/script>/gi;
     const TOOL_DESCRIPTOR_RE = /<script\b(?=[^>]*\bid\s*=\s*["']tool-descriptor["'])[^>]*>([\s\S]*?)<\/script>/gi;
-    function isDataScriptOpenTag(openTag) { return /type\s*=\s*["']?(?:text\/(?:plain|markdown)|application\/json)/i.test(openTag); }
+    function classifyScriptOpenTag(openTag) {
+      let i=openTag.search(/\bscript\b/i); if(i<0)return 'data'; i+=6; let type=null;
+      while(i<openTag.length){while(/\s/.test(openTag[i]||''))i++;if(openTag[i]==='>'||!openTag[i])break;let start=i;while(!/[\s=>]/.test(openTag[i]||''))i++;const name=openTag.slice(start,i).toLowerCase();while(/\s/.test(openTag[i]||''))i++;let value='';if(openTag[i]==='='){i++;while(/\s/.test(openTag[i]||''))i++;const quote=openTag[i];if(quote==='"'||quote==="'"){i++;start=i;while(i<openTag.length&&openTag[i]!==quote)i++;value=openTag.slice(start,i);if(openTag[i]===quote)i++;}else{start=i;while(!/[\s>]/.test(openTag[i]||''))i++;value=openTag.slice(start,i);}}if(name==='type'&&type===null)type=value;}
+      if(type===null||type==='')return 'classic-javascript';const essence=type.toLowerCase();if(essence==='module')return 'module';
+      return new Set(['application/ecmascript','application/javascript','application/x-ecmascript','application/x-javascript','text/ecmascript','text/javascript','text/javascript1.0','text/javascript1.1','text/javascript1.2','text/javascript1.3','text/javascript1.4','text/javascript1.5','text/jscript','text/livescript','text/x-ecmascript','text/x-javascript']).has(essence)?'classic-javascript':'data';
+    }
     function toolSkillBlocks(html) { TOOL_SKILL_RE.lastIndex=0; return [...html.matchAll(TOOL_SKILL_RE)]; }
     function toolDescriptorBlocks(html) { TOOL_DESCRIPTOR_RE.lastIndex=0; return [...html.matchAll(TOOL_DESCRIPTOR_RE)]; }
     function toolIdentity(fileName) {
@@ -1114,7 +1121,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       const blocks = []; const nonce = '__HTML_IDE_DATA_' + Math.random().toString(36).slice(2) + '_';
       const masked = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, block => {
         const open = block.match(/^<script\b[^>]*>/i)[0];
-        if (!isDataScriptOpenTag(open)) return block;
+        if (classifyScriptOpenTag(open)!=='data') return block;
         const token = nonce + blocks.length + '__'; blocks.push(block); return token;
       });
       return { html: masked, restore: value => value.replace(new RegExp(nonce + '(\\d+)__', 'g'), (_, i) => blocks[Number(i)]) };
@@ -1126,12 +1133,33 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       } return html;
     }
     function escapeInlineScriptBreakouts(html) {
-      const closePrefix = '<' + '/script', closeTag = closePrefix + '>';
-      let output='', cursor=0, openRe=/<script\b[^>]*>/gi, m;
-      while ((m=openRe.exec(html))) { output+=html.slice(cursor,m.index)+m[0]; let i=openRe.lastIndex;
-        if(isDataScriptOpenTag(m[0])) { const end=html.toLowerCase().indexOf(closeTag,i); if(end<0) throw new Error('Malformed non-executing script data block.'); output+=html.slice(i,end+9); cursor=end+9; openRe.lastIndex=cursor; continue; }
-        let mode=null; for(;i<html.length;i++){const c=html[i],n=html[i+1], close=html.slice(i,i+closePrefix.length).toLowerCase()===closePrefix; if(close&&mode===null)break; if(close){output+='<\\/script';i+=7;continue;} output+=c; if(!mode){if(c==='"'||c==="'"||c==='`')mode=c;else if(c==='/'&&n==='/'){mode='L';output+=n;i++;}else if(c==='/'&&n==='*'){mode='B';output+=n;i++;}}else if(mode==='L'&&c==='\n')mode=null;else if(mode==='B'&&c==='*'&&n==='/'){output+=n;i++;mode=null;}else if(c==='\\') {output+=n||'';i++;} else if(c===mode)mode=null;}
-        const closeEnd=html.indexOf('>',i); if(i<html.length&&closeEnd>=0){output+=html.slice(i,closeEnd+1);cursor=closeEnd+1;openRe.lastIndex=cursor;}else{cursor=i;break;}
+      const closeRe=/<\/script\b[^>]*>/gi, openRe=/<script\b[^>]*>/gi;
+      let output='', cursor=0, scriptNumber=0, open;
+      while((open=openRe.exec(html))){
+        output+=html.slice(cursor,open.index)+open[0]; const start=openRe.lastIndex; scriptNumber+=1;
+        const scriptKind=classifyScriptOpenTag(open[0]);
+        if(scriptKind==='data'){closeRe.lastIndex=start;const dataClose=closeRe.exec(html);if(!dataClose)throw new Error('Malformed non-executing script data block.');output+=html.slice(start,dataClose.index+dataClose[0].length);cursor=dataClose.index+dataClose[0].length;openRe.lastIndex=cursor;continue;}
+        const nextOpen=/<script\b[^>]*>/gi;nextOpen.lastIndex=start;const laterOpen=nextOpen.exec(html), boundary=laterOpen?laterOpen.index:html.length;
+        closeRe.lastIndex=start; const candidates=[]; let candidate; while((candidate=closeRe.exec(html))&&candidate.index<boundary)candidates.push({start:candidate.index,end:candidate.index+candidate[0].length});
+        let structural=null;
+        for(const target of candidates){
+          const source=html.slice(start,target.end), masked=source.replace(closeRe,match=>' '.repeat(match.length));
+          const comments=[], tokens=[];
+          try { const tokenizer=acorn.tokenizer(masked,{ecmaVersion:'latest',sourceType:scriptKind==='module'?'module':'script',onComment:(block,text,from,to)=>comments.push([from,to])}); for(let token=tokenizer.getToken();token.type.label!=='eof';token=tokenizer.getToken())tokens.push([token.start,token.end]); acorn.parse(masked,{ecmaVersion:'latest',sourceType:scriptKind==='module'?'module':'script'}); }
+          catch(error){continue;}
+          const protectedAt=at=>comments.some(range=>range[0]<=at&&at<range[1])||tokens.some(range=>range[0]<=at&&at<range[1]);
+          const first=candidates.find(item=>item.start<target.end&&!protectedAt(item.start-start));
+          if(first){structural=first;break;}
+          const finalComment=comments.find(range=>range[1]===masked.length&&range[0]<=target.start-start&&target.start-start<range[1]);
+          if(target===candidates[candidates.length-1]&&finalComment&&!tokens.some(range=>range[0]<=target.start-start&&target.start-start<range[1])){structural=target;break;}
+        }
+        if(!structural){const line=html.slice(0,start).split('\n').length;throw new Error('Cannot tokenize executable script '+scriptNumber+' near line '+line+'. Check JavaScript syntax before the closing script tag.');}
+        const body=html.slice(start,structural.start), maskedBody=body.replace(closeRe,match=>' '.repeat(match.length));
+        const comments=[], tokens=[];
+        try { const tokenizer=acorn.tokenizer(maskedBody,{ecmaVersion:'latest',sourceType:scriptKind==='module'?'module':'script',onComment:(block,text,from,to)=>comments.push([from,to])}); for(let token=tokenizer.getToken();token.type.label!=='eof';token=tokenizer.getToken())tokens.push([token.start,token.end]); }
+        catch(error){const line=html.slice(0,start).split('\n').length+(error.loc?error.loc.line-1:0);throw new Error('Cannot tokenize executable script '+scriptNumber+' near line '+line+': '+error.message);}
+        const protectedAt=at=>comments.some(range=>range[0]<=at&&at<range[1])||tokens.some(range=>range[0]<=at&&at<range[1]);
+        output+=body.replace(closeRe,(match,offset)=>protectedAt(offset)?'<\\/script'+match.slice(8):match)+html.slice(structural.start,structural.end); cursor=structural.end;openRe.lastIndex=cursor;
       } return output+html.slice(cursor);
     }
     function detectScriptBreakouts(html) { const escaped=escapeInlineScriptBreakouts(html); return escaped===html?[]:[{line:1,snippet:'literal closing-script token escaped in executable script'}]; }

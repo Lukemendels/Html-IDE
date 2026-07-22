@@ -40,3 +40,7 @@ Patch packets are source-hash-bound and exact-match atomic transactions. The par
 ## Regression fixtures
 
 `failing-code/Failing-V2.html` is the final parser/export regression fixture. `node test_export.cjs` compiles it against the generated Pico.css, PDF.js (including worker), and SheetJS vault payloads, verifies each payload is injected once, rejects authored PDF worker ownership, and confirms executable payloads do not leak into document text.
+
+### Executable script breakout scanner
+
+Before library packing, executable script breakout protection lexically scans JavaScript so authored closing-script sequences in strings, templates, and comments are escaped without changing the true structural closing tag. The scanner uses an embedded, offline Acorn tokenizer rather than an approximate handwritten JavaScript grammar. Token ranges and comments identify strings, templates, regex literals, division, and comments while preserving the true structural closing tag. Acorn is compiler-internal: it is bundled with the IDE, is not an application library stem, and is never injected into compiled user tools. The compiler reads each start tag’s actual `type` attribute, handles every script element independently, and uses Acorn only for classic JavaScript, modules, and recognized JavaScript/ECMAScript MIME types; every other nonempty script type remains a data script and retains the separate masking path.
