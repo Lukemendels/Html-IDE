@@ -33,12 +33,43 @@ const required = [
   'A rejected atomic packet does not change the source.',
   'Reuse the same source hash when the source did not change.',
   '## Patch Reliability Checklist',
-  '### JSON Validity', '### Search Text', '### Match Counts', '### Patch Scope',
-  '### No Overlap', '### Runtime Consistency', '<HTML_OPEN>',
-  '- skills/local-html-ide.md', 'Copy the block above and click Open HTML Tool in StickShift.'
+  '### JSON Validity',
+  '### Search Text',
+  '### Match Counts',
+  '### Patch Scope',
+  '### No Overlap',
+  '### Runtime Consistency',
+  '<HTML_OPEN>',
+  '- skills/local-html-ide.md',
+  'Copy the block above and click Open HTML Tool in StickShift.'
 ];
-for (const value of required) assert(text.includes(value), `missing canonical skill content: ${value}`);
-for (const value of ['Apply exact matches only deliberately.','requires current-source verification.','Detailed operational note','preserves safe exact patch behavior.','&lt;script']) assert(!text.includes(value), `fabricated or invalid content is absent: ${value}`);
-for (let rule = 1; rule <= 17; rule += 1) assert(text.includes(`### ${rule}.`), `packet-generation rule ${rule} exists`);
-assert(!/\bSEARCH:\s*\/\s*REPLACE:/i.test(text), 'legacy SEARCH/REPLACE packet format is not authorized');
+
+for (const value of required) {
+  assert(text.includes(value), `missing canonical skill content: ${value}`);
+}
+
+const prohibited = [
+  'Apply exact matches only deliberately.',
+  'requires current-source verification.',
+  'Detailed operational note',
+  'preserves safe exact patch behavior.',
+  '&lt;script'
+];
+
+for (const value of prohibited) {
+  assert(!text.includes(value), `fabricated or invalid content is absent: ${value}`);
+}
+
+for (let rule = 1; rule <= 17; rule += 1) {
+  assert(
+    text.includes(`### ${rule}.`),
+    `packet-generation rule ${rule} exists`
+  );
+}
+
+assert(
+  !/\bSEARCH:\s*\/\s*REPLACE:/i.test(text),
+  'legacy SEARCH/REPLACE packet format is not authorized'
+);
+
 console.log('local HTML IDE skill contract passed');
