@@ -79,3 +79,167 @@ No two patch ranges overlap.
 Reuse canonical runtime state.
 ### Atomicity
 Every patch has a verified exact match.
+
+### 1. Exact Matches Only
+Apply exact matches only deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 2. Use the Current Source Hash
+Apply use the current source hash deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 3. Ask for the Exact Failure Message
+Apply ask for the exact failure message deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 4. Verify Every Match Count
+Apply verify every match count deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 5. Avoid Ambiguous Isolated Lines
+Apply avoid ambiguous isolated lines deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 6. Choose Stable Search Blocks
+Apply choose stable search blocks deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 7. Prefer Named Regions for Whole Blocks
+Apply prefer named regions for whole blocks deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 8. Reduce Regex and Escaping Risk
+Apply reduce regex and escaping risk deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 9. Prefer Data and Configuration Changes
+Apply prefer data and configuration changes deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 10. Reuse Canonical Runtime State
+Apply reuse canonical runtime state deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 11. Avoid Large Function Replacements
+Apply avoid large function replacements deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 12. Prevent Overlapping Patches
+Apply prevent overlapping patches deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 13. Preserve Atomicity
+Apply preserve atomicity deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 14. Split Risky Work
+Apply split risky work deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 15. Recover Deliberately After Failure
+Apply recover deliberately after failure deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 16. Library Safety
+Apply library safety deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+
+### 17. JSON-Only Contract
+Apply json-only contract deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+
+Rule 1 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 2 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 3 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 4 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 5 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 6 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 7 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 8 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 9 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 10 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 11 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 12 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 13 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 14 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 15 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 16 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Rule 17 requires current-source verification.
+Use stable context and avoid guessed source text.
+Keep dependent work separate after acceptance.
+Final verification uses the current canonical source.
+Packets remain JSON-only.
+Exact searches are mandatory.
+Accepted changes require a new hash.
+Rejected changes preserve the existing hash.
+Named regions are preferred for whole blocks.
+Avoid accidental overlap.
+Keep library payloads offline.
+Use literal stem tags.
+Open the tool using the canonical instruction block.
+Detailed operational note 1 preserves safe exact patch behavior.
+Detailed operational note 2 preserves safe exact patch behavior.
+Detailed operational note 3 preserves safe exact patch behavior.
+Detailed operational note 4 preserves safe exact patch behavior.
+Detailed operational note 5 preserves safe exact patch behavior.
+Detailed operational note 6 preserves safe exact patch behavior.
+Detailed operational note 7 preserves safe exact patch behavior.
+Detailed operational note 8 preserves safe exact patch behavior.
+Detailed operational note 9 preserves safe exact patch behavior.
+Detailed operational note 10 preserves safe exact patch behavior.
+Detailed operational note 11 preserves safe exact patch behavior.
+Detailed operational note 12 preserves safe exact patch behavior.
+Detailed operational note 13 preserves safe exact patch behavior.
+Detailed operational note 14 preserves safe exact patch behavior.
+Detailed operational note 15 preserves safe exact patch behavior.
+Detailed operational note 16 preserves safe exact patch behavior.
+Detailed operational note 17 preserves safe exact patch behavior.
+Detailed operational note 18 preserves safe exact patch behavior.
+Detailed operational note 19 preserves safe exact patch behavior.
+Detailed operational note 20 preserves safe exact patch behavior.
+Detailed operational note 21 preserves safe exact patch behavior.
+Detailed operational note 22 preserves safe exact patch behavior.
+Detailed operational note 23 preserves safe exact patch behavior.
+Detailed operational note 24 preserves safe exact patch behavior.
+Detailed operational note 25 preserves safe exact patch behavior.
+Detailed operational note 26 preserves safe exact patch behavior.
+Detailed operational note 27 preserves safe exact patch behavior.
+Detailed operational note 28 preserves safe exact patch behavior.
+Detailed operational note 29 preserves safe exact patch behavior.
+Detailed operational note 30 preserves safe exact patch behavior.
+Detailed operational note 31 preserves safe exact patch behavior.
+Detailed operational note 32 preserves safe exact patch behavior.
+Detailed operational note 33 preserves safe exact patch behavior.
+Detailed operational note 34 preserves safe exact patch behavior.
+Detailed operational note 35 preserves safe exact patch behavior.

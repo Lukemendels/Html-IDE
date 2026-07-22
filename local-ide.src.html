@@ -1140,7 +1140,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
         const scriptKind=classifyScriptOpenTag(open[0]);
         if(scriptKind==='data'){closeRe.lastIndex=start;const dataClose=closeRe.exec(html);if(!dataClose)throw new Error('Malformed non-executing script data block.');output+=html.slice(start,dataClose.index+dataClose[0].length);cursor=dataClose.index+dataClose[0].length;openRe.lastIndex=cursor;continue;}
         closeRe.lastIndex=start; const candidates=[]; let candidate; while((candidate=closeRe.exec(html)))candidates.push({start:candidate.index,end:candidate.index+candidate[0].length});
-        let structural=null;
+        let structural=null, lineCommentFallback=null;
         for(const target of candidates){
           const source=html.slice(start,target.end), masked=source.replace(closeRe,match=>' '.repeat(match.length));
           const comments=[], tokens=[];
@@ -1150,9 +1150,9 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
           const first=candidates.find(item=>item.start<target.end&&!protectedAt(item.start-start));
           if(first){structural=first;break;}
           const finalComment=comments.find(range=>range[1]===masked.length&&range[0]<=target.start-start&&target.start-start<range[1]);
-          const following=html.slice(target.end);
-          if(finalComment&&!tokens.some(range=>range[0]<=target.start-start&&target.start-start<range[1])&&/^\s*(?:<script\b|<\/body\b|<\/html\b|$)/i.test(following)){structural=target;break;}
+          if(finalComment&&!tokens.some(range=>range[0]<=target.start-start&&target.start-start<range[1])&&(!lineCommentFallback||html.slice(lineCommentFallback.end).toLowerCase().startsWith('</script')))lineCommentFallback=target;
         }
+        if(!structural)structural=lineCommentFallback;
         if(!structural){const line=html.slice(0,start).split('\n').length;throw new Error('Cannot tokenize executable script '+scriptNumber+' near line '+line+'. Check JavaScript syntax before the closing script tag.');}
         const body=html.slice(start,structural.start), maskedBody=body.replace(closeRe,match=>' '.repeat(match.length));
         const comments=[], tokens=[];

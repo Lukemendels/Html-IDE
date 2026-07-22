@@ -201,3 +201,20 @@ const authoredOpenScriptCases = [
   'const example = "<script>";', "const example = '<script>';", 'const example = `<script></script>`;', 'const pattern = /<script>/;', '// Documentation example: <script>\nconst value = 1;', '/* Example markup: <script> */\nconst value = 1;'
 ];
 for (const source of authoredOpenScriptCases) { const html=`<script>${source}</script>`; const normalized=escapeInlineScriptBreakouts(html); assert(normalized.includes('<script>'), `authored opening script text remains present: ${source}`); if(source.includes('</script>')) assert(normalized.includes('<\\/script>')); else assert.equal(normalized,html,`authored opening script text remains stable: ${source}`); assert.equal(executableScripts(normalized).length,1); compile(executableScripts(normalized)[0].body); assert.equal(escapeInlineScriptBreakouts(normalized),normalized); }
+
+const trailingCommentHtmlCases = [
+  '<script>// comment</script><div>Content</div>',
+  '<script>// comment</script>\n<div>Content</div>',
+  '<script>// comment</script><style>body { color: black; }</style>',
+  '<script>// comment</script><!-- following comment -->',
+  '<script>// comment</script>Following text',
+  '<script>// comment</script><p>Content</p><script>const second = 1;</script>',
+  '<script>// comment</script><script type="text/html"><div>template</div></script><script>const third = 3;</script>'
+];
+for (const source of trailingCommentHtmlCases) {
+  const normalized=escapeInlineScriptBreakouts(source), scripts=extractStructuralScripts(normalized);
+  assert.equal(escapeInlineScriptBreakouts(normalized),normalized, 'arbitrary HTML trailing-comment normalization is idempotent');
+  assert(scripts.length >= 1, 'structural close remains extractable before arbitrary HTML');
+  for (const script of scripts) if (!isDataScript(script.open)) compile(script.body);
+  assert(!scripts[0].body.includes('Content') && !scripts[0].body.includes('const second') && !scripts[0].body.includes('const third'), 'following document content is not swallowed');
+}
