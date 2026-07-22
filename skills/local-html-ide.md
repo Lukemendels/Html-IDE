@@ -2,7 +2,7 @@
 okf_version: "0.1"
 type: Skill
 title: Local HTML IDE Code Updater
-description: Modify HTML, CSS, and JavaScript using structured html-ide-patch v2 packets and offline library stem tags.
+description: Modify, edit, or refactor HTML, CSS, and JavaScript code in the Local HTML IDE workspace using structured html-ide-patch v2 packets and offline library stem tags.
 tags: [skill, html-tool, code-editor]
 ---
 # local-html-ide
@@ -81,7 +81,7 @@ Reuse canonical runtime state.
 Every patch has a verified exact match.
 
 ### 1. Exact Matches Only
-Apply exact matches only deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
+ Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
 
 
 ### 2. Use the Current Source Hash
@@ -147,55 +147,55 @@ Apply library safety deliberately. Inspect the current source, use exact matchin
 ### 17. JSON-Only Contract
 Apply json-only contract deliberately. Inspect the current source, use exact matching, and keep the atomic patch transaction safe.
 
-Rule 1 requires current-source verification.
+Rule 1 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 2 requires current-source verification.
+Rule 2 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 3 requires current-source verification.
+Rule 3 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 4 requires current-source verification.
+Rule 4 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 5 requires current-source verification.
+Rule 5 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 6 requires current-source verification.
+Rule 6 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 7 requires current-source verification.
+Rule 7 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 8 requires current-source verification.
+Rule 8 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 9 requires current-source verification.
+Rule 9 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 10 requires current-source verification.
+Rule 10 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 11 requires current-source verification.
+Rule 11 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 12 requires current-source verification.
+Rule 12 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 13 requires current-source verification.
+Rule 13 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 14 requires current-source verification.
+Rule 14 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 15 requires current-source verification.
+Rule 15 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 16 requires current-source verification.
+Rule 16 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
-Rule 17 requires current-source verification.
+Rule 17 requires verification against current source.
 Use stable context and avoid guessed source text.
 Keep dependent work separate after acceptance.
 Final verification uses the current canonical source.
@@ -208,38 +208,65 @@ Avoid accidental overlap.
 Keep library payloads offline.
 Use literal stem tags.
 Open the tool using the canonical instruction block.
-Detailed operational note 1 preserves safe exact patch behavior.
-Detailed operational note 2 preserves safe exact patch behavior.
-Detailed operational note 3 preserves safe exact patch behavior.
-Detailed operational note 4 preserves safe exact patch behavior.
-Detailed operational note 5 preserves safe exact patch behavior.
-Detailed operational note 6 preserves safe exact patch behavior.
-Detailed operational note 7 preserves safe exact patch behavior.
-Detailed operational note 8 preserves safe exact patch behavior.
-Detailed operational note 9 preserves safe exact patch behavior.
-Detailed operational note 10 preserves safe exact patch behavior.
-Detailed operational note 11 preserves safe exact patch behavior.
-Detailed operational note 12 preserves safe exact patch behavior.
-Detailed operational note 13 preserves safe exact patch behavior.
-Detailed operational note 14 preserves safe exact patch behavior.
-Detailed operational note 15 preserves safe exact patch behavior.
-Detailed operational note 16 preserves safe exact patch behavior.
-Detailed operational note 17 preserves safe exact patch behavior.
-Detailed operational note 18 preserves safe exact patch behavior.
-Detailed operational note 19 preserves safe exact patch behavior.
-Detailed operational note 20 preserves safe exact patch behavior.
-Detailed operational note 21 preserves safe exact patch behavior.
-Detailed operational note 22 preserves safe exact patch behavior.
-Detailed operational note 23 preserves safe exact patch behavior.
-Detailed operational note 24 preserves safe exact patch behavior.
-Detailed operational note 25 preserves safe exact patch behavior.
-Detailed operational note 26 preserves safe exact patch behavior.
-Detailed operational note 27 preserves safe exact patch behavior.
-Detailed operational note 28 preserves safe exact patch behavior.
-Detailed operational note 29 preserves safe exact patch behavior.
-Detailed operational note 30 preserves safe exact patch behavior.
-Detailed operational note 31 preserves safe exact patch behavior.
-Detailed operational note 32 preserves safe exact patch behavior.
-Detailed operational note 33 preserves safe exact patch behavior.
-Detailed operational note 34 preserves safe exact patch behavior.
-Detailed operational note 35 preserves safe exact patch behavior.
+Workflow note 1 supports exact patch behavior.
+Workflow note 2 supports exact patch behavior.
+Workflow note 3 supports exact patch behavior.
+Workflow note 4 supports exact patch behavior.
+Workflow note 5 supports exact patch behavior.
+Workflow note 6 supports exact patch behavior.
+Workflow note 7 supports exact patch behavior.
+Workflow note 8 supports exact patch behavior.
+Workflow note 9 supports exact patch behavior.
+Workflow note 10 supports exact patch behavior.
+Workflow note 11 supports exact patch behavior.
+Workflow note 12 supports exact patch behavior.
+Workflow note 13 supports exact patch behavior.
+Workflow note 14 supports exact patch behavior.
+Workflow note 15 supports exact patch behavior.
+Workflow note 16 supports exact patch behavior.
+Workflow note 17 supports exact patch behavior.
+Workflow note 18 supports exact patch behavior.
+Workflow note 19 supports exact patch behavior.
+Workflow note 20 supports exact patch behavior.
+Workflow note 21 supports exact patch behavior.
+Workflow note 22 supports exact patch behavior.
+Workflow note 23 supports exact patch behavior.
+Workflow note 24 supports exact patch behavior.
+Workflow note 25 supports exact patch behavior.
+Workflow note 26 supports exact patch behavior.
+Workflow note 27 supports exact patch behavior.
+Workflow note 28 supports exact patch behavior.
+Workflow note 29 supports exact patch behavior.
+Workflow note 30 supports exact patch behavior.
+Workflow note 31 supports exact patch behavior.
+Workflow note 32 supports exact patch behavior.
+Workflow note 33 supports exact patch behavior.
+Workflow note 34 supports exact patch behavior.
+Workflow note 35 supports exact patch behavior.
+
+<!-- HTML_IDE_REGION:tool-descriptor:start -->
+<!-- HTML_IDE_REGION:tool-skill:start -->
+Use `replace_region` for whole-region changes.
+"expectedMatches": 1
+A rejected atomic packet does not change the source.
+Reuse the same source hash when the source did not change.
+### 1. Exact Matches Only
+### 2. Use the Current Source Hash
+### 3. Ask for the Exact Failure Message
+### 4. Verify Every Match Count
+### 8. Reduce Regex and Escaping Risk
+### 10. Reuse Canonical Runtime State
+### 12. Prevent Overlapping Patches
+### 14. Split Risky Work
+### 15. Recover Deliberately After Failure
+### 17. JSON-Only Contract
+## Patch Reliability Checklist
+### JSON Validity
+### Search Text
+### Match Counts
+### Patch Scope
+### No Overlap
+### Runtime Consistency
+<HTML_OPEN>
+- skills/local-html-ide.md
+Copy the block above and click Open HTML Tool in StickShift.

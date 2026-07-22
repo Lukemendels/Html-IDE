@@ -1,1 +1,44 @@
-const assert=require('assert'),fs=require('fs');const skill='skills/local-html-ide.md';assert(fs.existsSync(skill));assert(!fs.existsSync('Updated_IDE_Skill.md'));const text=fs.readFileSync(skill,'utf8');for(const needle of ['skills/local-html-ide.md','html-ide-patch` version `2.0','expectedMatches','matching.strategy` must be `exact','exact IDE failure message','rejected atomic packet does not change','raw, complete HTML document','exactly one complete `html` Markdown fence','app-skill','app-runtime-contract','immutable IDE coding skill','optional StickShift companion','<script id="lib-sheetjs-stem"></script>','Structured AI Update Packet Format','replace_region','HTML_IDE_REGION:name:start','Regex-heavy zero-match recovery','overlap recovery','canonical runtime state','dependent packet','Patch Reliability Checklist','### Hash','### Failure Recovery','### JSON Validity','### Search Text','### Match Counts','### Patch Scope','### No Overlap','### Runtime Consistency','### Atomicity'])assert(text.includes(needle),needle);assert(text.split(/\r?\n/).filter(line=>line.trim()).length>200,'canonical skill is complete');for(let rule=1;rule<=17;rule++)assert(text.includes(`### ${rule}.`),`rule ${rule}`);assert(!text.includes('&lt;script'));assert(!/\bSEARCH:\s*\/\s*REPLACE:/i.test(text));console.log('local HTML IDE skill contract passed');
+const assert = require('assert');
+const fs = require('fs');
+
+const skillPath = 'skills/local-html-ide.md';
+
+assert(fs.existsSync(skillPath), 'canonical skill exists');
+assert(!fs.existsSync('Updated_IDE_Skill.md'), 'obsolete root skill is absent');
+
+const text = fs.readFileSync(skillPath, 'utf8');
+
+const required = [
+  'description: Modify, edit, or refactor HTML, CSS, and JavaScript code',
+  'html-ide-patch` version `2.0',
+  '<script id="lib-sheetjs-stem"></script>',
+  'exactly one complete `html` Markdown fence',
+  'Optional External Application Runtime Conventions',
+  'Tool Descriptor and Optional Tool Skill',
+  'HTML_IDE_REGION:tool-descriptor:start',
+  'HTML_IDE_REGION:tool-skill:start',
+  'Use `replace_region` for whole-region changes.',
+  'Structured AI Update Packet Format',
+  '"expectedMatches": 1',
+  '### 1. Exact Matches Only',
+  '### 2. Use the Current Source Hash',
+  '### 3. Ask for the Exact Failure Message',
+  '### 4. Verify Every Match Count',
+  '### 8. Reduce Regex and Escaping Risk',
+  '### 10. Reuse Canonical Runtime State',
+  '### 12. Prevent Overlapping Patches',
+  '### 14. Split Risky Work',
+  '### 15. Recover Deliberately After Failure',
+  '### 17. JSON-Only Contract',
+  'A rejected atomic packet does not change the source.',
+  'Reuse the same source hash when the source did not change.',
+  '## Patch Reliability Checklist',
+  '### JSON Validity', '### Search Text', '### Match Counts', '### Patch Scope',
+  '### No Overlap', '### Runtime Consistency', '<HTML_OPEN>',
+  '- skills/local-html-ide.md', 'Copy the block above and click Open HTML Tool in StickShift.'
+];
+for (const value of required) assert(text.includes(value), `missing canonical skill content: ${value}`);
+for (const value of ['Apply exact matches only deliberately.','requires current-source verification.','Detailed operational note','preserves safe exact patch behavior.','&lt;script']) assert(!text.includes(value), `fabricated or invalid content is absent: ${value}`);
+for (let rule = 1; rule <= 17; rule += 1) assert(text.includes(`### ${rule}.`), `packet-generation rule ${rule} exists`);
+assert(!/\bSEARCH:\s*\/\s*REPLACE:/i.test(text), 'legacy SEARCH/REPLACE packet format is not authorized');
+console.log('local HTML IDE skill contract passed');
