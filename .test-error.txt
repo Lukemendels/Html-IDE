@@ -18,7 +18,7 @@ PASS authored ABI import restores one Tool Skill
 PASS markdown-only PDF.js example does not request a PDF.js triplet
 PASS unknown active library stem reports its exact ID
 PASS built Local HTML IDE is a StickShift install package
-FAIL built Local HTML IDE carries exactly one install skill block
+PASS built Local HTML IDE carries exactly one install skill block
 PASS Failing-V2 fixture uses the real generated Pico/PDF.js/SheetJS vault payloads
 PASS Failing-V2 fixture packs Pico.css exactly once
 PASS Failing-V2 fixture packs PDF.js main, worker, and setup exactly once
