@@ -17,6 +17,7 @@ PRISM_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "prismjs", "prism.js
 CODEJAR_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "codejar", "dist", "codejar.js")
 PATCH_ENGINE_JS_PATH = os.path.join(WORKSPACE_DIR, "scripts", "patch-engine.cjs")
 ACORN_JS_PATH = os.path.join(WORKSPACE_DIR, "node_modules", "acorn", "dist", "acorn.js")
+IDE_CODING_SKILL_PATH = os.path.join(WORKSPACE_DIR, "skills", "local-html-ide.md")
 
 # Offline library vault paths — resolved from locally installed npm packages
 LIB_PATHS = {
@@ -104,12 +105,37 @@ def load_lib(token, path):
     return content
 
 def escape_script_data_block(content):
-    """Keep library text safe inside HTML <script> data blocks."""
-    return re.sub(r"</script", r"<\\/script", content, flags=re.IGNORECASE)
-
+    """Keep JavaScript library text inert inside HTML script data blocks."""
+    content = re.sub(r"</script", r"<\/script", content, flags=re.IGNORECASE)
+    # Some document libraries contain literal namespaced XML such as
+    # <style:master-page> inside JavaScript strings. Encode the angle
+    # bracket as a JavaScript escape so host HTML scanners do not
+    # mistake library data for live markup; runtime strings are unchanged.
+    return re.sub(r"<(?=/?style:)", lambda _match: r"\x3C", content, flags=re.IGNORECASE)
 def escape_style_data_block(content):
     """Keep CSS text safe inside HTML <style> data blocks."""
     return re.sub(r"</style", r"<\\/style", content, flags=re.IGNORECASE)
+
+
+def load_ide_coding_skill():
+    if not os.path.isfile(IDE_CODING_SKILL_PATH):
+        raise RuntimeError(f"Canonical IDE coding skill is missing: {IDE_CODING_SKILL_PATH}")
+    with open(IDE_CODING_SKILL_PATH, "r", encoding="utf-8") as f:
+        skill = f.read().strip()
+    required = [
+        'okf_version: "0.1"',
+        'type: Skill',
+        'title:',
+        'description:',
+        'tags:',
+        '<HTML_OPEN>',
+        'tool: local-ide.html',
+        '- skills/local-html-ide.md',
+    ]
+    missing = [token for token in required if token not in skill]
+    if missing:
+        raise RuntimeError("Canonical IDE coding skill is incomplete: " + ", ".join(missing))
+    return escape_script_data_block(skill)
 
 def main():
     if not os.path.exists(TEMPLATE_PATH):
@@ -139,6 +165,9 @@ def main():
     with open(PATCH_ENGINE_JS_PATH, "r", encoding="utf-8") as f:
         patch_engine_js = f.read()
 
+    print(f"Reading canonical IDE coding skill: {IDE_CODING_SKILL_PATH}")
+    ide_coding_skill = load_ide_coding_skill()
+
     print("Loading offline library vault...")
     libs = {}
     for token, path in LIB_PATHS.items():
@@ -155,6 +184,9 @@ def main():
     html_content = html_content.replace("/* {{prism_js}} */", prism_js)
     html_content = html_content.replace("/* {{acorn_js}} */", acorn_js)
     html_content = html_content.replace("/* {{patch_engine_js}} */", patch_engine_js)
+    html_content = html_content.replace("{{ide_coding_skill}}", ide_coding_skill)
+    if "{{ide_coding_skill}}" in html_content:
+        raise RuntimeError("IDE coding skill placeholder was not fully resolved.")
 
     print("Inlining offline library vault...")
     for token, content in libs.items():

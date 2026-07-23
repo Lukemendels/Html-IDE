@@ -15,6 +15,16 @@ assert(built.includes('window.HtmlIdePatchEngine') || built.includes('root.HtmlI
 assert.equal((built.match(/HTML_IDE_COMPILER_INTERNAL_ACORN/g)||[]).length, 1, 'generated IDE contains one compiler-internal Acorn marker');
 assert.equal((builtPublic.match(/HTML_IDE_COMPILER_INTERNAL_ACORN/g)||[]).length, 1, 'public generated IDE contains one compiler-internal Acorn marker');
 assert(!built.includes('{{acorn_js}}') && !builtPublic.includes('{{acorn_js}}'), 'generated IDE artifacts resolve the Acorn placeholder');
+assert(!built.includes('{{ide_coding_skill}}') && !builtPublic.includes('{{ide_coding_skill}}'), 'generated IDE artifacts resolve the canonical skill placeholder');
+const canonicalIdeSkill = fs.readFileSync(path.join(root, 'skills/local-html-ide.md'), 'utf8').trim();
+const builtSkillMatch = built.match(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*type="text\/markdown")(?=[^>]*data-skill-slug="local-html-ide")[^>]*>([\s\S]*?)<\/script>/i);
+assert(builtSkillMatch, 'standalone IDE contains its StickShift install skill');
+const normalizeEmbeddedSkill = value => value.replace(/<\\\/script/gi, '</script').trim();
+assert.equal(normalizeEmbeddedSkill(builtSkillMatch[1]), normalizeEmbeddedSkill(canonicalIdeSkill), 'standalone IDE embeds the canonical skill byte-for-byte after HTML-safe normalization');
+assert.equal((built.match(/id="stickshift-skill" data-skill-slug="local-html-ide"/g)||[]).length, 1, 'standalone IDE contains exactly one StickShift install skill');
+assert(!built.includes('id="ide-coding-skill"'), 'obsolete duplicate IDE skill block is absent');
+assert(!/<\/?style:/i.test(built), 'standalone package exposes no raw namespaced style tags to host HTML scanners');
+assert(/\\x3Cstyle:/i.test(built), 'namespaced style markup is preserved through JavaScript hex escapes');
 
 function extractFunction(name) {
   const idx = src.indexOf('function ' + name + '(');
@@ -76,6 +86,7 @@ console.log('export integrity tests passed');
 
 const buildScript = fs.readFileSync(path.join(root, 'build_local_ide.py'), 'utf8');
 assert(buildScript.includes('"lib_pdfjs"') && buildScript.includes('"lib_pdfjs_worker"'), 'build config includes both mandatory PDF.js inputs');
+assert(buildScript.includes('IDE_CODING_SKILL_PATH') && buildScript.includes('{{ide_coding_skill}}'), 'build reads and injects the canonical IDE coding skill');
 assert(buildScript.includes('MANDATORY_LIB_TOKENS') && buildScript.includes('Required PDF.js build input'), 'build fails clearly for missing or empty PDF.js inputs');
 const workerSource = fs.readFileSync(path.join(root, 'node_modules/pdfjs-dist/build/pdf.worker.min.js'), 'utf8');
 const workerVaultMatch = built.match(/<script type="text\/plain" id="lib-pdfjs-worker">([\s\S]*?)<\/script>/i);
