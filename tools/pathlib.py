@@ -28,10 +28,16 @@ def _correct_contract_details():
       return body.replace(footer,'').trim();
     }
     function findNonAsciiLocations'''
-        updated, count = re.subn(pattern, lambda _match: replacement, source, count=1)
+        source, count = re.subn(pattern, lambda _match: replacement, source, count=1)
         if count != 1:
             raise RuntimeError(f"round-trip footer correction expected 1 match, found {count}")
-        source_path.write_text(updated, encoding="utf-8")
+
+        old_reader = "      return block ? block.textContent.replace(/<\\\\/script/gi, '</script') : '';"
+        new_reader = "      const escapedClose = '<' + String.fromCharCode(92) + '/script';\n      return block ? block.textContent.split(escapedClose).join('</script') : '';"
+        if source.count(old_reader) != 1:
+            raise RuntimeError(f"embedded skill reader correction expected 1 match, found {source.count(old_reader)}")
+        source = source.replace(old_reader, new_reader, 1)
+        source_path.write_text(source, encoding="utf-8")
 
     integrity_path = root / "tests" / "export-integrity.test.cjs"
     if integrity_path.exists():
