@@ -11,13 +11,13 @@ permissions:
 
 jobs:
   apply-and-test:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/stickshift-install-contract'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Check out feature branch
         uses: actions/checkout@v4
         with:
-          ref: feature/stickshift-install-contract
+          ref: ${{ github.event.pull_request.head.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Repair staged patch runner
@@ -115,12 +115,12 @@ jobs:
         run: |
           rm tools/apply_stickshift_install_contract.py
           rm .github/workflows/apply-stickshift-install-contract.yml
-          rm -f .patch-error.txt .test-error.txt
+          rm -f .patch-error.txt .test-error.txt .contract-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: align HTML IDE exports with StickShift installer"
-          git push origin HEAD:feature/stickshift-install-contract
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Persist diagnostics
         if: failure()
@@ -130,5 +130,5 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .patch-error.txt .test-error.txt 2>/dev/null || true
             git commit -m "chore: capture StickShift contract diagnostics" || true
-            git push origin HEAD:feature/stickshift-install-contract
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
           fi
