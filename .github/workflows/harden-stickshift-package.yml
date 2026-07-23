@@ -27,22 +27,18 @@ jobs:
 
           build_path = Path('build_local_ide.py')
           build = build_path.read_text(encoding='utf-8')
-          old = '''def escape_script_data_block(content):
-              """Keep library text safe inside HTML <script> data blocks."""
-              return re.sub(r"</script", r"<\\/script", content, flags=re.IGNORECASE)
-          '''.replace('          ', '')
-          new = '''def escape_script_data_block(content):
+          start = build.index('def escape_script_data_block(content):')
+          end = build.index('\ndef escape_style_data_block(content):', start)
+          replacement = r'''def escape_script_data_block(content):
               """Keep JavaScript library text inert inside HTML script data blocks."""
-              content = re.sub(r"</script", r"<\\/script", content, flags=re.IGNORECASE)
+              content = re.sub(r"</script", r"<\/script", content, flags=re.IGNORECASE)
               # Some document libraries contain literal namespaced XML such as
               # <style:master-page> inside JavaScript strings. Encode the angle
               # bracket as a JavaScript escape so host HTML scanners do not
               # mistake library data for live markup; runtime strings are unchanged.
-              return re.sub(r"<(?=/?style:)", lambda _match: r"\\x3C", content, flags=re.IGNORECASE)
-          '''.replace('          ', '')
-          if build.count(old) != 1:
-              raise SystemExit(f'escape_script_data_block anchor expected once, found {build.count(old)}')
-          build_path.write_text(build.replace(old, new, 1), encoding='utf-8')
+              return re.sub(r"<(?=/?style:)", lambda _match: r"\x3C", content, flags=re.IGNORECASE)
+          '''.replace('          ', '').rstrip()
+          build_path.write_text(build[:start] + replacement + build[end:], encoding='utf-8')
 
           test_path = Path('tests/export-integrity.test.cjs')
           test = test_path.read_text(encoding='utf-8')
