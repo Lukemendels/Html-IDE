@@ -37,7 +37,7 @@ jobs:
           text = text.replace(triple, "    r'''def escape_style_data_block(content):", 2)
           path.write_text(text, encoding='utf-8')
           PY
-          rm -f .patch-error.txt
+          rm -f .patch-error.txt .test-error.txt
 
       - name: Apply contract patch
         shell: bash
@@ -55,36 +55,43 @@ jobs:
         run: python3 build_local_ide.py
 
       - name: Run contract and regression tests
+        shell: bash
         run: |
-          node tests/patch-engine.test.cjs
-          node test_export.cjs
-          node tests/export-integrity.test.cjs
-          node tests/stickshift-package-contract.test.cjs
-          node tests/local-html-ide-skill.test.cjs
-          node tests/script-breakout-scanner.test.cjs
-          python3 tests/html-shell-integrity.test.py
-          npm run lint
-          cmp -s local-ide.html public/local-ide.html
-          git diff --check
+          set +e
+          {
+            node tests/patch-engine.test.cjs &&
+            node test_export.cjs &&
+            node tests/export-integrity.test.cjs &&
+            node tests/stickshift-package-contract.test.cjs &&
+            node tests/local-html-ide-skill.test.cjs &&
+            node tests/script-breakout-scanner.test.cjs &&
+            python3 tests/html-shell-integrity.test.py &&
+            npm run lint &&
+            cmp -s local-ide.html public/local-ide.html &&
+            git diff --check
+          } 2>&1 | tee .test-error.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          exit $status
 
       - name: Commit implementation
         run: |
           rm tools/apply_stickshift_install_contract.py
           rm .github/workflows/apply-stickshift-install-contract.yml
-          rm -f .patch-error.txt
+          rm -f .patch-error.txt .test-error.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: align HTML IDE exports with StickShift installer"
           git push origin HEAD:feature/stickshift-install-contract
 
-      - name: Persist patch diagnostics
+      - name: Persist diagnostics
         if: failure()
         run: |
-          if [ -f .patch-error.txt ]; then
+          if [ -f .patch-error.txt ] || [ -f .test-error.txt ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add .patch-error.txt
-            git commit -m "chore: capture StickShift contract patch failure" || true
+            git add .patch-error.txt .test-error.txt 2>/dev/null || true
+            git commit -m "chore: capture StickShift contract diagnostics" || true
             git push origin HEAD:feature/stickshift-install-contract
           fi
