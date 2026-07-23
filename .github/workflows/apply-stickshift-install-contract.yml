@@ -20,6 +20,20 @@ jobs:
           ref: feature/stickshift-install-contract
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Repair staged patch runner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/apply_stickshift_install_contract.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'updated, count = re.subn(pattern, replacement, text, count=1, flags=flags)'
+          new = 'updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)'
+          if text.count(old) != 1:
+              raise SystemExit('sub_once implementation anchor not found exactly once')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          rm -f .patch-error.txt
+
       - name: Apply contract patch
         shell: bash
         run: |
