@@ -30,7 +30,12 @@ jobs:
           new = 'updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=flags)'
           if text.count(old) != 1:
               raise SystemExit('sub_once implementation anchor not found exactly once')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          text = text.replace(old, new, 1)
+          triple = "    '''def escape_style_data_block(content):"
+          if text.count(triple) != 2:
+              raise SystemExit('escape-style triple-string anchors not found exactly twice')
+          text = text.replace(triple, "    r'''def escape_style_data_block(content):", 2)
+          path.write_text(text, encoding='utf-8')
           PY
           rm -f .patch-error.txt
 
