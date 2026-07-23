@@ -1,3 +1,0 @@
-/home/runner/work/Html-IDE/Html-IDE/tools/apply_stickshift_install_contract.py:105: SyntaxWarning: invalid escape sequence '\/'
-  '''    function readEmbeddedStickShiftSkill() {
-Applied HTML IDE StickShift installation-contract patch.

@@ -44,3 +44,14 @@ Patch packets are source-hash-bound and exact-match atomic transactions. The par
 ### Executable script breakout scanner
 
 Before library packing, executable script breakout protection lexically scans JavaScript so authored closing-script sequences in strings, templates, and comments are escaped without changing the true structural closing tag. The scanner uses an embedded, offline Acorn tokenizer rather than an approximate handwritten JavaScript grammar. Token ranges and comments identify strings, templates, regex literals, division, and comments while preserving the true structural closing tag. Acorn is compiler-internal: it is bundled with the IDE, is not an application library stem, and is never injected into compiled user tools. The compiler reads each start tag’s actual `type` attribute, handles every script element independently, and uses Acorn only for classic JavaScript, modules, and recognized JavaScript/ECMAScript MIME types; every other nonempty script type remains a data script and retains the separate masking path.
+
+## StickShift authoring and installation contracts
+
+The IDE deliberately uses two representations:
+
+- **Authoring representation:** a source-resident `tool-descriptor` plus an optional `tool-skill`. These blocks are editable, source-hash-bound, and participate in atomic IDE patches.
+- **Installation representation:** the downloaded file contains `STICKSHIFT_TOOL`, one canonical `stickshift-skill`, and the non-blocking setup panel expected by StickShift. The compiler derives this package from the authoring blocks.
+
+Select **Package for StickShift** only for a registered tool with a valid Tool Descriptor. Packaging is blocked when the descriptor is absent or malformed. Descriptor-only tools receive a generated registration skill; tools with an authored Tool Skill preserve its operating instructions under canonical StickShift frontmatter. Every install skill declares `type: Skill`, includes the `html-tool` tag, and emits an `HTML_OPEN` request containing both the downloaded filename and `skills/<slug>.md`.
+
+The Local HTML IDE itself follows the same distribution contract. `skills/local-html-ide.md` is the sole source of truth; `build_local_ide.py` embeds it into `local-ide.html` as the installable `stickshift-skill`. The preferred setup path is StickShift **Tools -> Install HTML Tool**. Copying the IDE Coding Skill remains a manual fallback only.

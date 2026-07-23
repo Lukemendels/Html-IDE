@@ -18,7 +18,7 @@ for f in ['local-ide.html','public/local-ide.html']:
   typ=attrs.get('type','').lower()
   if typ in ('text/plain','text/markdown','application/json'): continue
   with tempfile.NamedTemporaryFile('w',suffix='.js') as x:
-   x.write(body);x.flush(); assert subprocess.run(['node','--check',x.name],capture_output=True).returncode==0, f+' invalid script'
+   x.write(body);x.flush(); result=subprocess.run(['node','--check',x.name],capture_output=True); assert result.returncode==0, f+' invalid script\n'+result.stderr.decode('utf-8',errors='replace')
  leaked=''.join(p.text)
  assert not any(x in leaked for x in ['function validateLegacyCompatibility','function validateCompiledPdfJs','window.__LOCAL_HTML_IDE_READY__']), f+' leaked script source'
 print('html shell integrity passed')

@@ -8,17 +8,19 @@ const api = apiFor(vault);
 let failures=0; function check(name,value){console.log((value?'PASS ':'FAIL ')+name);if(!value)failures++;}
 const descriptor = `<!-- HTML_IDE_REGION:tool-descriptor:start -->\n<script id="tool-descriptor" type="application/json">{"schema":"stickshift-tool","version":"1.0","file":"{{TOOL_FILE}}","skillSlug":"{{SKILL_SLUG}}","title":"{{TOOL_TITLE}}","description":"Open a useful local demo tool.","open":{"protocol":"HTML_OPEN","tool":"{{TOOL_FILE}}"},"skill":null}</script>\n<!-- HTML_IDE_REGION:tool-descriptor:end -->`;
 const standalone = '<html><body><p>standalone</p></body></html>';
-check('standalone compilation remains plain', !api.compileAppSource(standalone,{fileName:'plain.html',embedStickShift:true}).html.includes('STICKSHIFT_TOOL'));
+let missingDescriptorError=''; try { api.compileAppSource(standalone,{fileName:'plain.html',embedStickShift:true}); } catch(error) { missingDescriptorError=String(error.message); }
+check('StickShift packaging requires a Tool Descriptor', missingDescriptorError.includes('Package for StickShift requires a valid Tool Descriptor'));
+check('standalone compilation remains plain when packaging is off', !api.compileAppSource(standalone,{fileName:'plain.html',embedStickShift:false}).html.includes('STICKSHIFT_TOOL'));
 check('descriptor-only source validates', api.validateToolIntegration('<html><body>'+descriptor+'</body></html>',false).ok);
 const registration=api.compileAppSource('<html><body>'+descriptor+'</body></html>',{fileName:'demo.html',embedStickShift:true}).html;
 check('descriptor-only emits const legacy identity', registration.includes('const STICKSHIFT_TOOL = { file: "demo.html", skillSlug: "demo", title: "Demo" }'));
-check('descriptor-only emits registration skill', registration.includes('id="stickshift-skill"')&&registration.includes('data-skill-kind="registration"')&&registration.includes('tool: demo.html'));
+check('descriptor-only emits canonical registration skill', registration.includes('id="stickshift-skill"')&&registration.includes('data-skill-kind="registration"')&&registration.includes('type: Skill')&&registration.includes('tags: [skill, html-tool]')&&registration.includes('tool: demo.html')&&registration.includes('- skills/demo.md'));
 check('legacy panel copies generated skill with file fallback', registration.includes("getElementById('stickshift-skill').textContent")&&registration.includes("execCommand('copy')")&&registration.includes('Are you using StickShift?'));
 const authoredDescriptor=descriptor.replace('"skill":null','"skill":{"elementId":"tool-skill","slug":"{{SKILL_SLUG}}"}');
 const authored=authoredDescriptor+'<!-- HTML_IDE_REGION:tool-skill:start --><script id="tool-skill" type="text/markdown">---\nname: old\n---\nWorkflow instructions.</script><!-- HTML_IDE_REGION:tool-skill:end -->';
 const authoredCompiled=api.compileAppSource('<html><body>'+authored+'</body></html>',{fileName:'workflow.html',embedStickShift:true}).html;
 check('authored Tool Skill compiles to legacy id only', authoredCompiled.includes('id="stickshift-skill"')&&!authoredCompiled.includes('id="tool-skill"')&&authoredCompiled.includes('data-skill-kind="authored"'));
-check('authored skill frontmatter normalized', authoredCompiled.includes('slug: workflow')&&authoredCompiled.includes('title: Workflow'));
+check('authored skill frontmatter normalized', authoredCompiled.includes('type: Skill')&&authoredCompiled.includes('title: \"Workflow\"')&&authoredCompiled.includes('description: \"Open a useful local demo tool.\"')&&authoredCompiled.includes('- skills/workflow.md'));
 check('Tool Skill normalization preserves escaped closing-script text', api.normalizeAuthoredToolSkill('<script id="tool-skill" type="text/markdown">literal <\\/script token</script>','workflow.html').includes('<\\/script'));
 const quoted='<html><body><script type="text/markdown">Example <script id="lib-jszip-stem"></script></script><script id="lib-jszip-stem"></script></body></html>';
 const packed=api.packLibraries(quoted); check('data blocks mask quoted stems', (packed.match(/injected-lib-jszip/g)||[]).length===1);
@@ -47,6 +49,9 @@ const fixture=fs.readFileSync('failing-code/Failing-V2.html','utf8');
 function count(text, needle) { return text.split(needle).length-1; }
 function extractVaultPayload(html,id) { const match=html.match(new RegExp(`<(?:(script|style))\\b(?=[^>]*\\bid=["']${id}["'])[^>]*>([\\s\\S]*?)<\\/\\1>`,'i')); if(!match)throw new Error('Missing generated vault payload: '+id); return match[2]; }
 const built=fs.readFileSync('local-ide.html','utf8');
+const builtIdeSkill=(built.match(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*data-skill-slug="local-html-ide")[^>]*>([\s\S]*?)<\/script>/i)||[])[1]||'';
+check('built Local HTML IDE is a StickShift install package', built.includes('const STICKSHIFT_TOOL = {\n      file: "local-ide.html"')&&builtIdeSkill.includes('type: Skill')&&builtIdeSkill.includes('tool: local-ide.html')&&builtIdeSkill.includes('- skills/local-html-ide.md'));
+check('built Local HTML IDE carries exactly one install skill block', (built.match(/id="stickshift-skill" data-skill-slug="local-html-ide"/g)||[]).length===1&&!built.includes('id="ide-coding-skill"'));
 const realVault={}; for(const id of ['lib-picocss','lib-pdfjs','lib-pdfjs-worker','lib-sheetjs'])realVault[id]={textContent:extractVaultPayload(built,id)};
 const realApi=apiFor(realVault), fixtureCompiled=realApi.compileAppSource(fixture,{fileName:'Parser-tool.html'}).html;
 check('Failing-V2 fixture uses the real generated Pico/PDF.js/SheetJS vault payloads', realVault['lib-sheetjs'].textContent.length>100000&&realVault['lib-pdfjs'].textContent.length>100000&&realVault['lib-pdfjs-worker'].textContent.length>100000);

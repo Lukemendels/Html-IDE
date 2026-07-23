@@ -150,9 +150,9 @@
         <span>Download Completed Tool</span>
       </button>
 
-      <label id="ssEmbedToggle" class="flex items-center space-x-2 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-xs text-gray-300 font-medium px-3.5 py-2 rounded-lg cursor-pointer transition-all" title="When checked, downloaded registered tools get a user-facing Tool Setup UI.">
+      <label id="ssEmbedToggle" class="flex items-center space-x-2 bg-[#1d1d24] hover:bg-[#252530] border border-[#2a2a35] text-xs text-gray-300 font-medium px-3.5 py-2 rounded-lg cursor-pointer transition-all" title="When checked, download a StickShift-installable package with identity, companion skill, and setup UI.">
         <input type="checkbox" id="ssEmbedCheckbox" class="accent-purple-500 h-3.5 w-3.5 cursor-pointer" checked>
-        <span class="select-none">Include Tool Setup UI</span>
+        <span class="select-none">Package for StickShift</span>
       </label>
 
       <button id="tool-descriptor-edit" class="text-xs text-gray-300 border border-[#2a2a35] px-3 py-2 rounded-lg">Tool Descriptor</button>
@@ -514,12 +514,12 @@
       <!-- Branch A: Yes, I use StickShift -->
       <div id="ss-content-yes" class="space-y-3.5 text-[11px] text-gray-300">
         <div class="space-y-1">
-          <span class="block font-semibold text-white">Step 1: Save the File</span>
-          <p class="text-gray-400 text-[10px]">Download this file and rename it exactly to <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">local-ide.html</code>.</p>
+          <span class="block font-semibold text-white">Step 1: Install through StickShift</span>
+          <p class="text-gray-400 text-[10px]">Open StickShift, choose <strong>Tools</strong>, click <strong>Install HTML Tool</strong>, and select <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">local-ide.html</code>. StickShift validates and installs the IDE plus <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">skills/local-html-ide.md</code> as one transaction.</p>
         </div>
         <div class="space-y-2">
-          <span class="block font-semibold text-white">Step 2: Install the IDE Coding Skill</span>
-          <p class="text-gray-400 text-[10px]">Copy the immutable IDE Coding Skill markdown configuration and save it into your StickShift installation directory as <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">skills/local-html-ide.md</code>.</p>
+          <span class="block font-semibold text-white">Step 2: Manual fallback</span>
+          <p class="text-gray-400 text-[10px]">Only use this fallback when the normal installer is unavailable. Copy the immutable IDE Coding Skill and save it as <code class="font-mono text-purple-400 bg-purple-500/10 px-1 py-0.5 rounded">skills/local-html-ide.md</code>.</p>
           <button id="ss-copy-skill" class="w-full flex items-center justify-center space-x-2 bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 rounded-lg transition-all cursor-pointer shadow-lg shadow-purple-500/15 text-[11px] focus:outline-none">
             <svg id="ss-copy-icon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
             <svg id="ss-check-icon" class="w-3.5 h-3.5 hidden text-green-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -527,8 +527,8 @@
           </button>
         </div>
         <div class="space-y-1">
-          <span class="block font-semibold text-white">Step 3: Access via Cockpit</span>
-          <p class="text-gray-400 text-[10px]">Your LLM agent can now open and control this workspace tool directly inside your StickShift environment.</p>
+          <span class="block font-semibold text-white">Step 3: Open from StickShift</span>
+          <p class="text-gray-400 text-[10px]">Open the IDE from the Tools catalog or approve the assistant's <code class="font-mono text-purple-400">HTML_OPEN</code> request. StickShift remains the human-controlled launch gate.</p>
         </div>
       </div>
 
@@ -547,92 +547,10 @@
     </div>
   </div>
 
-  <!-- Immutable Local HTML IDE Coding Skill Markup -->
-  <script type="text/markdown" id="ide-coding-skill" data-skill-slug="local-html-ide">
----
-okf_version: "0.1"
-type: Skill
-title: Local HTML IDE Code Updater
-description: Modify, edit, or refactor HTML, CSS, and JS code in the Local HTML IDE workspace using structured html-ide-patch v2 packets and offline library stem tags.
-tags: [skill, html-tool, code-editor]
----
-
-# local-html-ide
-
-## Purpose
-Use this skill when you want to modify, add, or delete code inside the active HTML editor workspace of the Local HTML IDE.
-
-## Available Offline Libraries
-The IDE contains preloaded offline library assets. You can inject them instantly into your HTML code by simply writing their corresponding **Stem Tags** anywhere inside the editor code:
-- **Alpine.js**: `&lt;script id="lib-alpine-stem"&gt;&lt;/script&gt;` (Reactive micro-framework)
-- **Pico.css**: `&lt;link rel="stylesheet" id="lib-picocss-stem"&gt;` (Classless semantic dark/light styling)
-- **JSZip**: `&lt;script id="lib-jszip-stem"&gt;&lt;/script&gt;` (Zip reader/writer)
-- **docxtemplater**: `&lt;script id="lib-docxtemplater-stem"&gt;&lt;/script&gt;` (Word document generation templates)
-- **docx**: `&lt;script id="lib-docx-stem"&gt;&lt;/script&gt;` (Gen Word documents from scratch)
-- **Mammoth.js**: `&lt;script id="lib-mammoth-stem"&gt;&lt;/script&gt;` (Docx plain text extractor)
-- **SheetJS (xlsx)**: `&lt;script id="lib-sheetjs-stem"&gt;&lt;/script&gt;` (Excel parse & workbook builder)
-- **PptxGenJS**: `&lt;script id="lib-pptxgen-stem"&gt;&lt;/script&gt;` (PowerPoint slide generator)
-- **PDF.js**: `&lt;script id="lib-pdfjs-stem"&gt;&lt;/script&gt;` (PDF text extractor)
-
-*IMPORTANT*: Never copy-paste the full minified library code into your editor updates. Simply insert the Stem Tag. The compilation packer will automatically inline the full library code on preview or download.
-
-## Create Mode
-For a brand-new app, return exactly one complete HTML document and no Markdown fences or commentary. Use library Stem Tags instead of pasting bundled minified libraries, and do not use CDN URLs when an equivalent offline Stem exists. Apps that need a runtime LLM workflow may embed their own separate runtime skill in `<script id="app-skill" type="text/markdown">` and a machine-readable contract in `<script id="app-runtime-contract" type="application/json">`; this is separate from the IDE coding patch protocol.
-
-## Tool Descriptor and Optional Tool Skill
-A standalone app may contain neither integration block. A registered tool contains one **Tool Descriptor** (structured JSON) and may contain one optional **Tool Skill**. The descriptor is metadata, not a skill, and may use `"skill": null`. Add a Tool Skill only for LLM-specific workflows; ordinary timers, calculators, dashboards, forms, and games do not need one. Both blocks are editable source and share the source hash; this IDE Coding Skill is immutable and outside `state.code`.
-
-Use the named regions `tool-descriptor` and `tool-skill`; use `replace_region` for whole-block changes. A descriptor uses `schema: "stickshift-tool"`, `version: "1.0"`, `open.protocol: "HTML_OPEN"`, and either `skill: null` or `{ "elementId": "tool-skill", "slug": "{{SKILL_SLUG}}" }`.
-
-An optional Tool Skill uses this source-resident block, placed just before `</body>`:
-```html
-<!-- HTML_IDE_REGION:tool-skill:start -->
-<script type="text/markdown" id="tool-skill">
----
-name: {{SKILL_SLUG}}
-description: ...
----
-...skill markdown...
-<\/script>
-<!-- HTML_IDE_REGION:tool-skill:end -->
-```
-In create mode, add it only when the tool requires LLM-specific operating instructions, structured workflows, packet contracts, interpretation rules, or multi-step agent behavior. Include frontmatter, when to use the tool, its inputs/outputs, clipboard or packet contracts, and the standard open-instructions footer. `{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are substituted at export. In edit mode, patch its text normally or use `replace_region` on `tool-skill`; skill and code patches share the same hash and atomicity. Never write a literal closing-script token in it—write `<\/script` instead. This differs from `app-skill`, which is an app runtime LLM workflow; `tool-skill` is the StickShift companion installed as `skills/{{SKILL_SLUG}}.md`. Both may coexist.
-
-## How the Agent Edits Code
-For edits to an existing app, generate a structured JSON `html-ide-patch` version `2.0` packet by default. The user will paste it into the AI Update Drawer. Include the exact current source hash supplied by the IDE/user as `target.sourceHash`, unique patch ids, explicit `expectedMatches`, and exact search text. Supported operations are `replace`, `insert_before`, `insert_after`, `delete`, and `replace_region` using `<!-- HTML_IDE_REGION:name:start -->` / `<!-- HTML_IDE_REGION:name:end -->` markers.
-
-### Structured AI Update Packet Format
-{
-  "protocol": "html-ide-patch",
-  "version": "2.0",
-  "target": { "sourceHash": "sha256:..." },
-  "patches": [
-    {
-      "id": "change-button-label",
-      "operation": "replace",
-      "matching": { "strategy": "exact", "expectedMatches": 1, "search": "<button>Save</button>" },
-      "replacement": "<button>Export</button>"
-    }
-  ]
-}
-
-### Rules for Generating Packets:
-1. **Exact Matches Only**: In v2.0, `matching.strategy` must be `exact`; do not request indentation or whitespace-normalized matching.
-2. **No Ambiguity**: If a search block appears more than once, add stable surrounding context or use a named region; do not rely on first occurrence.
-3. **Atomicity**: All patches must be valid together. One bad patch rejects the whole packet.
-4. **Library Safety**: Insert Stem Tags for libraries; never paste full bundled library payloads.
-5. **JSON-only contract**: Return one complete JSON packet (optionally in one `json` fence). Never return `SEARCH:`/`REPLACE:` blocks, prose, or additional packets.
-
-## How to open the tool
-A local HTML tool cannot be opened from a chat hyperlink. Give the operator this block verbatim, then one instruction line, and nothing else:
-
-<HTML_OPEN>
-tool: local-ide.html
-include:
-- skills/local-html-ide.md
-</HTML_OPEN>
-
-Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
+  <!-- Immutable Local HTML IDE Coding Skill Markup.
+       build_local_ide.py injects skills/local-html-ide.md here. -->
+  <script type="text/markdown" id="stickshift-skill" data-skill-slug="local-html-ide">
+{{ide_coding_skill}}
   </script>
 
   <script>
@@ -1097,6 +1015,15 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
         return resolveBlockPlaceholders(normalized, TOOL_SKILL_RE, identity);
       });
     }
+    function skillFrontmatterValue(markdown,key) {
+      const escaped=String(key||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const match=String(markdown||'').match(new RegExp('^'+escaped+'\s*:\s*(.+)$','m'));
+      if(!match)return '';
+      const raw=match[1].trim();
+      if(raw.startsWith('"')&&raw.endsWith('"')){try{return JSON.parse(raw);}catch(error){return raw.slice(1,-1);}}
+      if(raw.startsWith("'")&&raw.endsWith("'"))return raw.slice(1,-1).replace(/''/g,"'");
+      return raw;
+    }
     function unpackInlinedLibraries(html) {
       let cleaned=html.replace(/<script id=["']injected-lib-pdfjs-worker["'][^>]*>[\s\S]*?<\/script>/gi,'').replace(/<script id=["']injected-lib-pdfjs-setup["'][^>]*>[\s\S]*?<\/script>/gi,'');
       cleaned=cleaned.replace(/<script id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/script>/gi,(_,id)=>`<script id="${id}-stem">${SCRIPT_CLOSE_TAG}`).replace(/<style id=["']injected-(lib-[a-z0-9-]+)["']>([\s\S]*?)<\/style>/gi,(_,id)=>`<link rel="stylesheet" id="${id}-stem">`);
@@ -1105,7 +1032,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
         const payload=compat[0], identity=payload.match(/const\s+STICKSHIFT_TOOL\s*=\s*\{\s*file:\s*"([^"]+)",\s*skillSlug:\s*"([^"]+)",\s*title:\s*"([^"]+)"/), skill=payload.match(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*data-skill-kind="([^"]+)")[^>]*>([\s\S]*?)<\/script>/i);
         if (!identity || !skill) throw new Error('Cannot import malformed StickShift compatibility block.');
         const [,file,slug,title]=identity, kind=skill[1], markdown=skill[2]; if(kind!=='registration'&&kind!=='authored')throw new Error('Unknown generated StickShift skill kind.');
-        const descriptor={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:(markdown.match(/^description:\s*(.+)$/m)||[])[1]||'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:kind==='authored'?{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}:null};
+        const descriptor={schema:'stickshift-tool',version:'1.0',file:'{{TOOL_FILE}}',skillSlug:'{{SKILL_SLUG}}',title:'{{TOOL_TITLE}}',description:skillFrontmatterValue(markdown,'description')||'Imported tool.',open:{protocol:'HTML_OPEN',tool:'{{TOOL_FILE}}'},skill:kind==='authored'?{elementId:'tool-skill',slug:'{{SKILL_SLUG}}'}:null};
         cleaned=replaceDescriptor(removeNamedRegion(cleaned.replace(payload,''),'tool-descriptor'),descriptor);
         if(kind==='authored'){ const body=extractAuthoredToolSkillBody(markdown,{file}); cleaned=replaceNamedRegion(cleaned,'tool-skill',`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${body}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`); }
       }
@@ -1185,16 +1112,38 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       supported.forEach(libId=>{const c=document.getElementById(libId);if(!c)return;const text=c.textContent, stemRe=libId==='lib-picocss'?new RegExp(`<link[^>]*id=["']${libId}-stem["'][^>]*>`,'gi'):new RegExp(`<script[^>]*id=["']${libId}-stem["'][^>]*>\\s*<\\/script>`,'gi');stemRe.lastIndex=0;const matchesBefore=(packedHtml.match(stemRe)||[]).length;if(!matchesBefore)return;const replacement=libId==='lib-picocss'?`<style id="injected-${libId}">${text}</style>`:libId==='lib-pdfjs'?(()=>{const w=document.getElementById('lib-pdfjs-worker');return `<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script><script id="injected-${libId}-worker" type="text/plain">${escapeScriptTextForHtml(w.textContent)}<\/script><script id="injected-${libId}-setup">(function(){if(typeof window==='undefined'||!window.pdfjsLib)return;if(window.__htmlIdePdfjsWorkerUrl)URL.revokeObjectURL(window.__htmlIdePdfjsWorkerUrl);var x=document.getElementById('injected-lib-pdfjs-worker').textContent;var u=URL.createObjectURL(new Blob([x],{type:'text/javascript'}));window.__htmlIdePdfjsWorkerUrl=u;window.pdfjsLib.GlobalWorkerOptions.workerSrc=u})()<\/script>`})():`<script id="injected-${libId}">${escapeScriptTextForHtml(text)}<\/script>`;let replacements=0;stemRe.lastIndex=0;packedHtml=packedHtml.replace(stemRe,()=>{replacements+=1;return replacement;});if(replacements!==matchesBefore)throw new Error('Library packing replaced '+replacements+' of '+matchesBefore+' active '+libId+' stems.');const wrapperRe=new RegExp(`<(?:script|style)\\b[^>]*id=["']injected-${libId}["'][^>]*>`,'gi');if((packedHtml.match(wrapperRe)||[]).length!==matchesBefore)throw new Error('Library packing emitted an unexpected number of injected '+libId+' wrappers.');});
       const compiled=dataMask.restore(packedHtml), remaining=findUnresolvedActiveLibraryStemsOutsideInjected(compiled);if(remaining.length)throw new Error('Library packing left active stem(s): '+remaining.map(stem=>stem.id).join(', ')+'.');return compiled;
     }
-    function extractAuthoredToolSkillBody(markdown, identity) {
+    function extractAuthoredToolSkillBody(markdown) {
       let body=String(markdown||'').replace(/^---[\s\S]*?---\s*/,'').trim();
-      const footer=new RegExp('\\n*<HTML_OPEN>\\n\\s*tool:\\s*'+identity.file.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\n<\\/HTML_OPEN>\\n*\\n*Copy the block above and click Open HTML Tool in StickShift\\.\\s*$');
+      const footer=/\n*## Open this tool\n[\s\S]*$/i;
       return body.replace(footer,'').trim();
     }
     function findNonAsciiLocations(text) { const rows=[]; for(let i=0;i<text.length&&rows.length<5;i++)if(text.charCodeAt(i)>127)rows.push({character:text[i],codePoint:'U+'+text.charCodeAt(i).toString(16).toUpperCase(),line:text.slice(0,i).split('\\n').length}); return rows; }
-    function legacySkillMarkdown(descriptor, identity, authored) {
-      const body = authored || `# ${descriptor.title}\n\nUse this local HTML tool when the user wants to open or use ${descriptor.title}.`;
-      const normalized = authored ? extractAuthoredToolSkillBody(body, identity) : body.trim();
-      return `---\nslug: ${descriptor.skillSlug}\ntitle: ${descriptor.title}\ndescription: ${descriptor.description}\n---\n\n${normalized}\n\n<HTML_OPEN>\ntool: ${identity.file}\n</HTML_OPEN>\n\nCopy the block above and click Open HTML Tool in StickShift.`;
+    function buildStickShiftInstallSkill(descriptor, identity, authored) {
+      const body = authored ? extractAuthoredToolSkillBody(authored) : `# ${descriptor.title}
+
+Use this local HTML tool when the user wants to open or use ${descriptor.title}.`;
+      const normalized = body.trim();
+      return `---
+okf_version: "0.1"
+type: Skill
+title: ${JSON.stringify(descriptor.title)}
+description: ${JSON.stringify(descriptor.description)}
+tags: [skill, html-tool]
+---
+
+${normalized}
+
+## Open this tool
+
+When this skill applies, emit this block exactly, followed by one instruction to open it in StickShift:
+
+<HTML_OPEN>
+tool: ${identity.file}
+include:
+- skills/${descriptor.skillSlug}.md
+</HTML_OPEN>
+
+Instruction line: "Copy the block above and click Open HTML Tool in StickShift."`;
     }
     function injectStickShiftCompliance(html,fileName) {
       if(html.includes('STICKSHIFT_COMPATIBILITY_START'))return html;
@@ -1202,7 +1151,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       const identity=toolIdentity(fileName), d={...check.descriptor,file:identity.file,skillSlug:check.descriptor.skillSlug==='{{SKILL_SLUG}}'?identity.slug:check.descriptor.skillSlug,title:check.descriptor.title==='{{TOOL_TITLE}}'?identity.title:check.descriptor.title};
       const authored=check.hasSkill ? toolSkillBlocks(html)[0][1] : null;
       html=html.replace(TOOL_SKILL_RE,'');
-      const skill=legacySkillMarkdown(d,identity,authored);
+      const skill=buildStickShiftInstallSkill(d,identity,authored);
       const kind=authored?'authored':'registration';
       const payload=`<!-- STICKSHIFT_COMPATIBILITY_START -->
 <script>const STICKSHIFT_TOOL = { file: ${JSON.stringify(identity.file)}, skillSlug: ${JSON.stringify(d.skillSlug)}, title: ${JSON.stringify(d.title)} };${SCRIPT_CLOSE_TAG}
@@ -1214,8 +1163,27 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       const at=documentEndIndex(html); return html.slice(0,at)+payload+html.slice(at);
     }
     function validateLegacyCompatibility(html,fileName) {
-      const ids=[...html.matchAll(/const\s+STICKSHIFT_TOOL\s*=\s*\{\s*file:\s*"([^"]+)",\s*skillSlug:\s*"([^"]+)",\s*title:\s*"([^"]+)"\s*\}/g)]; const skills=[...html.matchAll(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*type="text\/markdown")(?=[^>]*data-skill-slug="([^"]+)")[^>]*>([\s\S]*?)<\/script>/g)];
-      const errors=[]; if(ids.length!==1)errors.push('Expected exactly one const STICKSHIFT_TOOL declaration.'); if(skills.length!==1)errors.push('Expected exactly one stickshift-skill block.'); if(ids.length&&skills.length){const [,file,slug,title]=ids[0], skillSlug=skills[0][1], markdown=skills[0][2]; if(file!==fileName)errors.push('Legacy identity file does not match download filename.'); if(slug!==skillSlug)errors.push('Legacy identity slug does not match embedded skill.'); if(!markdown.includes('slug: '+slug)||!markdown.includes('title: '+title)||!markdown.includes('description: ')||!markdown.includes('tool: '+file))errors.push('Legacy skill frontmatter or HTML_OPEN block does not match identity.');} if(!html.includes("getElementById('stickshift-skill').textContent")||!html.includes("execCommand('copy')"))errors.push('Legacy copy fallback is incomplete.'); const compat=(html.match(/<!-- STICKSHIFT_COMPATIBILITY_START -->[\s\S]*?<!-- STICKSHIFT_COMPATIBILITY_END -->/)||[])[0]||''; const nonAscii=findNonAsciiLocations(compat); if(nonAscii.length)errors.push('Legacy compatibility block must be ASCII-only: '+nonAscii.map(x=>x.codePoint+' line '+x.line).join(', ')); return {ok:!errors.length,errors};
+      const ids=[...html.matchAll(/const\s+STICKSHIFT_TOOL\s*=\s*\{\s*file:\s*"([^"]+)",\s*skillSlug:\s*"([^"]+)",\s*title:\s*"([^"]+)"\s*\}/g)];
+      const skills=[...html.matchAll(/<script\b(?=[^>]*id="stickshift-skill")(?=[^>]*type="text\/markdown")(?=[^>]*data-skill-slug="([^"]+)")[^>]*>([\s\S]*?)<\/script>/g)];
+      const errors=[];
+      if(ids.length!==1)errors.push('Expected exactly one const STICKSHIFT_TOOL declaration.');
+      if(skills.length!==1)errors.push('Expected exactly one stickshift-skill block.');
+      if(ids.length&&skills.length){
+        const [,file,slug]=ids[0], skillSlug=skills[0][1], markdown=skills[0][2];
+        if(file!==fileName)errors.push('StickShift identity file does not match download filename.');
+        if(slug!==skillSlug)errors.push('StickShift identity slug does not match embedded skill.');
+        if(!/^okf_version:\s*["']?0\.1["']?\s*$/mi.test(markdown))errors.push('Install skill must declare okf_version 0.1.');
+        if(!/^type:\s*Skill\s*$/mi.test(markdown))errors.push('Install skill must declare type: Skill.');
+        if(!/^title:\s*.+$/mi.test(markdown)||!/^description:\s*.+$/mi.test(markdown))errors.push('Install skill requires title and description.');
+        if(!/^tags:\s*\[[^\]]*html-tool[^\]]*\]\s*$/mi.test(markdown))errors.push('Install skill tags must include html-tool.');
+        if(!markdown.includes('tool: '+file))errors.push('Install skill HTML_OPEN does not match identity filename.');
+        if(!markdown.includes('- skills/'+slug+'.md'))errors.push('Install skill HTML_OPEN must include its installed skill path.');
+      }
+      if(!html.includes("getElementById('stickshift-skill').textContent")||!html.includes("execCommand('copy')"))errors.push('StickShift copy fallback is incomplete.');
+      const compat=(html.match(/<!-- STICKSHIFT_COMPATIBILITY_START -->[\s\S]*?<!-- STICKSHIFT_COMPATIBILITY_END -->/)||[])[0]||'';
+      const nonAscii=findNonAsciiLocations(compat);
+      if(nonAscii.length)errors.push('StickShift compatibility block must be ASCII-only: '+nonAscii.map(x=>x.codePoint+' line '+x.line).join(', '));
+      return {ok:!errors.length,errors};
     }
     function findUnresolvedActiveLibraryStems(html) {
       const masked=maskDataScriptBlocks(html).html;
@@ -1234,7 +1202,22 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       return {ok:!errors.length,errors};
     }
     function validateCompiledAppHtml(html, sourceHtml) { const pdf=validateCompiledPdfJs(sourceHtml||html,html); if(!pdf.ok)return pdf; const v=validateToolIntegration(html,true); if(!v.ok)return v; if(/id=["']stickshift-skill["']/i.test(html) && !html.includes('STICKSHIFT_COMPATIBILITY_START'))return {ok:false,errors:['Unexpected legacy skill block.']}; const stems=findUnresolvedActiveLibraryStemsOutsideInjected(html); return stems.length?{ok:false,errors:stems.map(stem=>'Unresolved active library stem: '+stem.id+' at line '+stem.line+'.')}:{ok:true,errors:[]}; }
-    function compileAppSource(editableSource,options={}) { const source=validateToolIntegration(editableSource,false); if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n')); const fileName=options.fileName||state.currentFileName; const authoredNormalized=normalizeAuthoredToolSkill(editableSource,fileName); const normalized=normalizePdfJsWorkerOwnership(authoredNormalized); let html=packLibraries(escapeInlineScriptBreakouts(normalized)); html=substituteIntegrationPlaceholders(html,fileName); if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName); const legacy=(options.embedStickShift && html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]}; if(!legacy.ok)throw new Error('Legacy compatibility validation failed:\n'+legacy.errors.join('\n')); const v=validateCompiledAppHtml(html,editableSource); if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n')); return {html,fileName,validation:v}; }
+    function compileAppSource(editableSource,options={}) {
+      const source=validateToolIntegration(editableSource,false);
+      if(!source.ok)throw new Error('Source integration validation failed:\n'+source.errors.join('\n'));
+      if(options.embedStickShift&&!source.descriptor)throw new Error('Package for StickShift requires a valid Tool Descriptor. Add one or turn packaging off.');
+      const fileName=options.fileName||state.currentFileName;
+      const authoredNormalized=normalizeAuthoredToolSkill(editableSource,fileName);
+      const normalized=normalizePdfJsWorkerOwnership(authoredNormalized);
+      let html=packLibraries(escapeInlineScriptBreakouts(normalized));
+      html=substituteIntegrationPlaceholders(html,fileName);
+      if(options.embedStickShift)html=injectStickShiftCompliance(html,fileName);
+      const legacy=(options.embedStickShift&&html.includes('STICKSHIFT_COMPATIBILITY_START'))?validateLegacyCompatibility(html,fileName):{ok:true,errors:[]};
+      if(!legacy.ok)throw new Error('StickShift package validation failed:\n'+legacy.errors.join('\n'));
+      const v=validateCompiledAppHtml(html,editableSource);
+      if(!v.ok)throw new Error('Compiled app validation failed:\n'+v.errors.join('\n'));
+      return {html,fileName,validation:v};
+    }
 
 
     // Sync Library Indicators on UI Accordion
@@ -1514,6 +1497,12 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       commitSource(replaceNamedRegion(state.code,'tool-skill',`<!-- HTML_IDE_REGION:tool-skill:start -->\n<script id="tool-skill" type="text/markdown">${markdown.replace(/<\/script/gi,'<\\/script')}<\/script>\n<!-- HTML_IDE_REGION:tool-skill:end -->`));
     });
 
+    function readEmbeddedStickShiftSkill() {
+      const block = document.getElementById('stickshift-skill');
+      const escapedClose = '<' + String.fromCharCode(92) + '/script';
+      return block ? block.textContent.split(escapedClose).join('</script') : '';
+    }
+
     // IDE setup tabs: the immutable IDE Coding Skill is copied only here.
     const SS_TAB_ACTIVE = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-purple-500 text-white cursor-pointer transition-all focus:outline-none";
     const SS_TAB_IDLE = "flex-1 pb-2 text-center text-[11px] font-semibold border-b-2 border-transparent text-gray-400 hover:text-white cursor-pointer transition-all focus:outline-none";
@@ -1529,7 +1518,7 @@ Instruction line: "Copy the block above and click Open HTML Tool in StickShift."
       elements.ssEmbedCheckbox.addEventListener('change', () => ssSetSetting(SS_KEYS.embed, elements.ssEmbedCheckbox.checked ? '1' : '0'));
     }
     elements.ssCopySkill.addEventListener('click', () => {
-      copyText(document.getElementById('ide-coding-skill').textContent).then(() => {
+      copyText(readEmbeddedStickShiftSkill()).then(() => {
         const copyTextSpan = document.getElementById('ss-copy-text'); copyTextSpan.textContent = 'Copied!';
         setTimeout(() => { copyTextSpan.textContent = 'Copy IDE Coding Skill'; }, 2000);
       });
