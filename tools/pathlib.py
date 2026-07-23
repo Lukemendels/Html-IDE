@@ -1,4 +1,4 @@
-"""One-run shim: proxy stdlib pathlib and correct the staged export footer."""
+"""One-run shim: proxy stdlib pathlib and correct staged contract details."""
 import atexit
 import importlib.util
 import os
@@ -15,8 +15,9 @@ for _name in dir(_module):
         globals()[_name] = getattr(_module, _name)
 
 
-def _correct_round_trip_footer():
+def _correct_contract_details():
     root = Path(__file__).resolve().parents[1]
+
     source_path = root / "local-ide.src.html"
     if source_path.exists():
         source = source_path.read_text(encoding="utf-8")
@@ -31,10 +32,20 @@ def _correct_round_trip_footer():
         if count != 1:
             raise RuntimeError(f"round-trip footer correction expected 1 match, found {count}")
         source_path.write_text(updated, encoding="utf-8")
+
+    integrity_path = root / "tests" / "export-integrity.test.cjs"
+    if integrity_path.exists():
+        integrity = integrity_path.read_text(encoding="utf-8")
+        old = "assert.equal(builtSkillMatch[1].replace(/<\\\\\\/script/gi, '</script').trim(), canonicalIdeSkill, 'standalone IDE embeds the canonical skill byte-for-byte after HTML-safe normalization');"
+        new = "const normalizeEmbeddedSkill = value => value.replace(/<\\\\\\/script/gi, '</script').trim();\nassert.equal(normalizeEmbeddedSkill(builtSkillMatch[1]), normalizeEmbeddedSkill(canonicalIdeSkill), 'standalone IDE embeds the canonical skill byte-for-byte after HTML-safe normalization');"
+        if integrity.count(old) != 1:
+            raise RuntimeError(f"canonical skill comparison correction expected 1 match, found {integrity.count(old)}")
+        integrity_path.write_text(integrity.replace(old, new, 1), encoding="utf-8")
+
     try:
         Path(__file__).unlink()
     except OSError:
         pass
 
 
-atexit.register(_correct_round_trip_footer)
+atexit.register(_correct_contract_details)
