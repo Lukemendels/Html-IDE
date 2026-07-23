@@ -23,6 +23,8 @@ const normalizeEmbeddedSkill = value => value.replace(/<\\\/script/gi, '</script
 assert.equal(normalizeEmbeddedSkill(builtSkillMatch[1]), normalizeEmbeddedSkill(canonicalIdeSkill), 'standalone IDE embeds the canonical skill byte-for-byte after HTML-safe normalization');
 assert.equal((built.match(/id="stickshift-skill" data-skill-slug="local-html-ide"/g)||[]).length, 1, 'standalone IDE contains exactly one StickShift install skill');
 assert(!built.includes('id="ide-coding-skill"'), 'obsolete duplicate IDE skill block is absent');
+assert(!/<\/?style:/i.test(built), 'standalone package exposes no raw namespaced style tags to host HTML scanners');
+assert(/\\x3Cstyle:/i.test(built), 'namespaced style markup is preserved through JavaScript hex escapes');
 
 function extractFunction(name) {
   const idx = src.indexOf('function ' + name + '(');

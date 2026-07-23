@@ -105,9 +105,13 @@ def load_lib(token, path):
     return content
 
 def escape_script_data_block(content):
-    """Keep library text safe inside HTML <script> data blocks."""
-    return re.sub(r"</script", r"<\\/script", content, flags=re.IGNORECASE)
-
+    """Keep JavaScript library text inert inside HTML script data blocks."""
+    content = re.sub(r"</script", r"<\/script", content, flags=re.IGNORECASE)
+    # Some document libraries contain literal namespaced XML such as
+    # <style:master-page> inside JavaScript strings. Encode the angle
+    # bracket as a JavaScript escape so host HTML scanners do not
+    # mistake library data for live markup; runtime strings are unchanged.
+    return re.sub(r"<(?=/?style:)", lambda _match: r"\x3C", content, flags=re.IGNORECASE)
 def escape_style_data_block(content):
     """Keep CSS text safe inside HTML <style> data blocks."""
     return re.sub(r"</style", r"<\\/style", content, flags=re.IGNORECASE)
