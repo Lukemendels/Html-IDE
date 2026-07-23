@@ -55,7 +55,7 @@ Traceback (most recent call last):
     x.write(body);x.flush(); result=subprocess.run(['node','--check',x.name],capture_output=True); assert result.returncode==0, f+' invalid script\n'+result.stderr.decode('utf-8',errors='replace')
                                                                                                           ^^^^^^^^^^^^^^^^^^^^
 AssertionError: local-ide.html invalid script
-/tmp/tmpn3cm170t.js:9844
+/tmp/tmpas9r58mf.js:9844
       return block ? block.textContent.replace(/<\\/script/gi, '</script') : '';
                                                ^
 
