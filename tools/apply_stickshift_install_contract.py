@@ -188,6 +188,26 @@ compile_replacement = '''    function compileAppSource(editableSource,options={}
     }'''
 html = sub_once(html, compile_pattern, compile_replacement, "require descriptor for StickShift packaging")
 
+# Preserve quoted YAML scalars across compiled-package import/re-export.
+unpack_anchor = '    function unpackInlinedLibraries(html) {'
+skill_value_helper = '''    function skillFrontmatterValue(markdown,key) {
+      const escaped=String(key||'').replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');
+      const match=String(markdown||'').match(new RegExp('^'+escaped+'\\s*:\\s*(.+)$','m'));
+      if(!match)return '';
+      const raw=match[1].trim();
+      if(raw.startsWith('"')&&raw.endsWith('"')){try{return JSON.parse(raw);}catch(error){return raw.slice(1,-1);}}
+      if(raw.startsWith("'")&&raw.endsWith("'"))return raw.slice(1,-1).replace(/''/g,"'");
+      return raw;
+    }
+'''
+html = replace_once(html, unpack_anchor, skill_value_helper + unpack_anchor, "add frontmatter scalar reader")
+html = replace_once(
+    html,
+    "description:(markdown.match(/^description:\\s*(.+)$/m)||[])[1]||'Imported tool.'",
+    "description:skillFrontmatterValue(markdown,'description')||'Imported tool.'",
+    "normalize imported descriptor description",
+)
+
 write(path, html)
 
 
@@ -305,7 +325,7 @@ test = replace_once(
     '''const built=fs.readFileSync('local-ide.html','utf8');
 const builtIdeSkill=(built.match(/<script\\b(?=[^>]*id="stickshift-skill")(?=[^>]*data-skill-slug="local-html-ide")[^>]*>([\\s\\S]*?)<\\/script>/i)||[])[1]||'';
 check('built Local HTML IDE is a StickShift install package', built.includes('const STICKSHIFT_TOOL = {\\n      file: "local-ide.html"')&&builtIdeSkill.includes('type: Skill')&&builtIdeSkill.includes('tool: local-ide.html')&&builtIdeSkill.includes('- skills/local-html-ide.md'));
-check('built Local HTML IDE carries exactly one install skill block', (built.match(/id="stickshift-skill"/g)||[]).length===1&&!built.includes('id="ide-coding-skill"'));''',
+check('built Local HTML IDE carries exactly one install skill block', (built.match(/id="stickshift-skill" data-skill-slug="local-html-ide"/g)||[]).length===1&&!built.includes('id="ide-coding-skill"'));''',
     "assert built IDE install package",
 )
 write(path, test)
@@ -325,7 +345,7 @@ const canonicalIdeSkill = fs.readFileSync(path.join(root, 'skills/local-html-ide
 const builtSkillMatch = built.match(/<script\\b(?=[^>]*id="stickshift-skill")(?=[^>]*type="text\\/markdown")(?=[^>]*data-skill-slug="local-html-ide")[^>]*>([\\s\\S]*?)<\\/script>/i);
 assert(builtSkillMatch, 'standalone IDE contains its StickShift install skill');
 assert.equal(builtSkillMatch[1].replace(/<\\\\\\/script/gi, '</script').trim(), canonicalIdeSkill, 'standalone IDE embeds the canonical skill byte-for-byte after HTML-safe normalization');
-assert.equal((built.match(/id="stickshift-skill"/g)||[]).length, 1, 'standalone IDE contains exactly one StickShift install skill');
+assert.equal((built.match(/id="stickshift-skill" data-skill-slug="local-html-ide"/g)||[]).length, 1, 'standalone IDE contains exactly one StickShift install skill');
 assert(!built.includes('id="ide-coding-skill"'), 'obsolete duplicate IDE skill block is absent');
 ''',
     "verify canonical IDE skill embedding",
@@ -410,5 +430,16 @@ marker = "## StickShift authoring and installation contracts"
 if marker not in doc:
     doc = doc.rstrip() + '''\n\n## StickShift authoring and installation contracts\n\nThe IDE deliberately uses two representations:\n\n- **Authoring representation:** a source-resident `tool-descriptor` plus an optional `tool-skill`. These blocks are editable, source-hash-bound, and participate in atomic IDE patches.\n- **Installation representation:** the downloaded file contains `STICKSHIFT_TOOL`, one canonical `stickshift-skill`, and the non-blocking setup panel expected by StickShift. The compiler derives this package from the authoring blocks.\n\nSelect **Package for StickShift** only for a registered tool with a valid Tool Descriptor. Packaging is blocked when the descriptor is absent or malformed. Descriptor-only tools receive a generated registration skill; tools with an authored Tool Skill preserve its operating instructions under canonical StickShift frontmatter. Every install skill declares `type: Skill`, includes the `html-tool` tag, and emits an `HTML_OPEN` request containing both the downloaded filename and `skills/<slug>.md`.\n\nThe Local HTML IDE itself follows the same distribution contract. `skills/local-html-ide.md` is the sole source of truth; `build_local_ide.py` embeds it into `local-ide.html` as the installable `stickshift-skill`. The preferred setup path is StickShift **Tools -> Install HTML Tool**. Copying the IDE Coding Skill remains a manual fallback only.\n'''
 write(path, doc)
+
+# Remove one-time runner artifacts before the validated implementation is committed.
+for transient in [
+    ROOT / ".contract-trigger",
+    ROOT / "sitecustomize.py",
+    ROOT / "tools" / "sitecustomize.py",
+]:
+    try:
+        transient.unlink()
+    except FileNotFoundError:
+        pass
 
 print("Applied HTML IDE StickShift installation-contract patch.")
