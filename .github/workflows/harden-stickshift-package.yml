@@ -68,12 +68,8 @@ jobs:
           cmp -s local-ide.html public/local-ide.html
           git diff --check
 
-      - name: Check out StickShift validator
-        uses: actions/checkout@v4
-        with:
-          repository: Lukemendels/StickShift
-          ref: feature/html-ide-install-contract
-          path: stickshift-host
+      - name: Clone public StickShift validator
+        run: git clone --depth 1 --branch feature/html-ide-install-contract https://github.com/Lukemendels/StickShift.git stickshift-host
 
       - name: Validate actual IDE package through StickShift
         working-directory: stickshift-host
@@ -82,6 +78,7 @@ jobs:
       - name: Commit validated package hardening
         run: |
           rm .github/workflows/harden-stickshift-package.yml
+          rm -rf stickshift-host
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
