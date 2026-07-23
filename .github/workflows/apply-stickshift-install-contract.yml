@@ -48,6 +48,43 @@ jobs:
           set -e
           exit $status
 
+      - name: Apply round-trip corrections
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          src_path = Path('local-ide.src.html')
+          src = src_path.read_text(encoding='utf-8')
+          anchor = '    function unpackInlinedLibraries(html) {'
+          helper = '''    function skillFrontmatterValue(markdown,key) {
+              const escaped=String(key||'').replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');
+              const match=String(markdown||'').match(new RegExp('^'+escaped+'\\\\s*:\\\\s*(.+)$','m'));
+              if(!match)return '';
+              const raw=match[1].trim();
+              if(raw.startsWith('"')&&raw.endsWith('"')){try{return JSON.parse(raw);}catch(error){return raw.slice(1,-1);}}
+              if(raw.startsWith("'")&&raw.endsWith("'"))return raw.slice(1,-1).replace(/''/g,"'");
+              return raw;
+            }
+'''
+          if src.count(anchor) != 1:
+              raise SystemExit('unpack helper anchor not found exactly once')
+          src = src.replace(anchor, helper + anchor, 1)
+          old_description = "description:(markdown.match(/^description:\\s*(.+)$/m)||[])[1]||'Imported tool.'"
+          new_description = "description:skillFrontmatterValue(markdown,'description')||'Imported tool.'"
+          if src.count(old_description) != 1:
+              raise SystemExit('imported description anchor not found exactly once')
+          src = src.replace(old_description, new_description, 1)
+          src_path.write_text(src, encoding='utf-8')
+
+          test_path = Path('test_export.cjs')
+          test = test_path.read_text(encoding='utf-8')
+          old_test = "check('built Local HTML IDE carries exactly one install skill block', (built.match(/id=\"stickshift-skill\"/g)||[]).length===1&&!built.includes('id=\"ide-coding-skill\"'));"
+          new_test = "check('built Local HTML IDE carries exactly one install skill block', (built.match(/id=\"stickshift-skill\" data-skill-slug=\"local-html-ide\"/g)||[]).length===1&&!built.includes('id=\"ide-coding-skill\"'));"
+          if test.count(old_test) != 1:
+              raise SystemExit('install skill count assertion not found exactly once')
+          test_path.write_text(test.replace(old_test, new_test, 1), encoding='utf-8')
+          PY
+
       - name: Install dependencies
         run: npm ci
 
