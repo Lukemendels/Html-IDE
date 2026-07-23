@@ -42,6 +42,15 @@ def _correct_contract_details():
             raise RuntimeError(f"canonical skill comparison correction expected 1 match, found {integrity.count(old)}")
         integrity_path.write_text(integrity.replace(old, new, 1), encoding="utf-8")
 
+    shell_test_path = root / "tests" / "html-shell-integrity.test.py"
+    if shell_test_path.exists():
+        shell_test = shell_test_path.read_text(encoding="utf-8")
+        old = "   x.write(body);x.flush(); assert subprocess.run(['node','--check',x.name],capture_output=True).returncode==0, f+' invalid script'"
+        new = "   x.write(body);x.flush(); result=subprocess.run(['node','--check',x.name],capture_output=True); assert result.returncode==0, f+' invalid script\\n'+result.stderr.decode('utf-8',errors='replace')"
+        if shell_test.count(old) != 1:
+            raise RuntimeError(f"shell diagnostic correction expected 1 match, found {shell_test.count(old)}")
+        shell_test_path.write_text(shell_test.replace(old, new, 1), encoding="utf-8")
+
     try:
         Path(__file__).unlink()
     except OSError:
