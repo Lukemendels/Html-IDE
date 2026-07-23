@@ -12,7 +12,7 @@ PASS data blocks mask quoted stems
 PASS placeholder resolution is scoped
 PASS region insertion anchors after script template
 PASS inline script breakout escaping is active
-FAIL authored Tool Skill export/import round trip preserves generated skill payload
+PASS authored Tool Skill export/import round trip preserves generated skill payload
 PASS registration ABI import restores descriptor-only source
 PASS authored ABI import restores one Tool Skill
 PASS markdown-only PDF.js example does not request a PDF.js triplet
@@ -35,3 +35,709 @@ PASS hostile replacement payload is literal for JS and CSS stems
 PASS hostile replacement payload creates one wrapper and no active SheetJS stem
 PASS non-empty authored PDF worker assignment is rejected
 PASS missing vault entry gives a packing diagnostic
+node:assert:150
+  throw new AssertionError(obj);
+  ^
+
+AssertionError [ERR_ASSERTION]: standalone IDE embeds the canonical skill byte-for-byte after HTML-safe normalization
+    at Object.<anonymous> (/home/runner/work/Html-IDE/Html-IDE/tests/export-integrity.test.cjs:22:8)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Object..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Function._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: '---\n' +
+    'okf_version: "0.1"\n' +
+    'type: Skill\n' +
+    'title: Local HTML IDE Code Updater\n' +
+    'description: Modify, edit, or refactor HTML, CSS, and JavaScript code in the Local HTML IDE workspace using structured html-ide-patch v2 packets and offline library stem tags.\n' +
+    'tags: [skill, html-tool, code-editor]\n' +
+    '---\n' +
+    '\n' +
+    '# local-html-ide\n' +
+    '\n' +
+    '## Purpose\n' +
+    '\n' +
+    'Use this skill to create or modify HTML, CSS, and JavaScript inside the active Local HTML IDE workspace.\n' +
+    '\n' +
+    'For an existing application, use the structured `html-ide-patch` version `2.0` protocol. For a new application, return one complete HTML document.\n' +
+    '\n' +
+    '## Available Offline Libraries\n' +
+    '\n' +
+    'The IDE contains preloaded offline library assets. Add a library by placing its literal Stem Tag in the editable HTML source.\n' +
+    '\n' +
+    '- **Alpine.js**: `<script id="lib-alpine-stem"></script>`\n' +
+    '- **Pico.css**: `<link rel="stylesheet" id="lib-picocss-stem">`\n' +
+    '- **JSZip**: `<script id="lib-jszip-stem"></script>`\n' +
+    '- **docxtemplater**: `<script id="lib-docxtemplater-stem"></script>`\n' +
+    '- **docx**: `<script id="lib-docx-stem"></script>`\n' +
+    '- **Mammoth.js**: `<script id="lib-mammoth-stem"></script>`\n' +
+    '- **SheetJS (xlsx)**: `<script id="lib-sheetjs-stem"></script>`\n' +
+    '- **PptxGenJS**: `<script id="lib-pptxgen-stem"></script>`\n' +
+    '- **PDF.js**: `<script id="lib-pdfjs-stem"></script>`\n' +
+    '\n' +
+    'Never paste the complete minified library payload into an application update. Insert the Stem Tag. The compiler inlines the offline library during preview or download.\n' +
+    '\n' +
+    'Do not use a CDN URL when an equivalent offline Stem exists.\n' +
+    '\n' +
+    '## Create Mode\n' +
+    '\n' +
+    'For a new application, prefer exactly one raw, complete HTML document with no surrounding commentary.\n' +
+    '\n' +
+    'The IDE also accepts exactly one complete `html` Markdown fence.\n' +
+    '\n' +
+    'Do not return:\n' +
+    '\n' +
+    '- prose before or after the document;\n' +
+    '- multiple Markdown fences;\n' +
+    '- unmatched fences;\n' +
+    '- partial HTML fragments;\n' +
+    '- a non-HTML fenced block;\n' +
+    '- a bundled minified library when an offline Stem exists.\n' +
+    '\n' +
+    'A complete application should include the necessary document structure, styling, interface, event listeners, and runtime behavior.\n' +
+    '\n' +
+    '## Optional External Application Runtime Conventions\n' +
+    '\n' +
+    'Some applications independently use an external LLM runtime. Those applications may use conventions such as:\n' +
+    '\n' +
+    '```html\n' +
+    '<script id="app-skill" type="text/markdown">\n' +
+    '...\n' +
+    '</script>\n' +
+    '```\n' +
+    '\n' +
+    'or:\n' +
+    '\n' +
+    '```html\n' +
+    '<script id="app-runtime-contract" type="application/json">\n' +
+    '...\n' +
+    '</script>\n' +
+    '```\n' +
+    '\n' +
+    'These are optional application-level conventions.\n' +
+    '\n' +
+    'They are:\n' +
+    '\n' +
+    '- not required by the Local HTML IDE;\n' +
+    '- not part of `html-ide-patch` version `2.0`;\n' +
+    '- not required or interpreted for ordinary IDE compilation;\n' +
+    "- added only when the application's external runtime contract requires them.\n" +
+    '\n' +
+    'Do not confuse these optional application-runtime blocks with the Local HTML IDE coding skill or a StickShift Tool Skill.\n' +
+    '\n' +
+    '## Tool Descriptor and Optional Tool Skill\n' +
+    '\n' +
+    'A standalone application may contain neither integration block.\n' +
+    '\n' +
+    'A registered StickShift tool contains one Tool Descriptor and may contain one optional Tool Skill.\n' +
+    '\n' +
+    'The Tool Descriptor is structured metadata, not a skill. It may use `"skill": null`.\n' +
+    '\n' +
+    'Add a Tool Skill only when the registered tool requires LLM-specific operating instructions, interpretation rules, structured workflows, packet contracts, or multi-step agent behavior. Ordinary timers, calculators, dashboards, forms, and games generally do not require one.\n' +
+    '\n' +
+    'The editable application source may contain named regions:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:tool-descriptor:start -->\n' +
+    '...\n' +
+    '<!-- HTML_IDE_REGION:tool-descriptor:end -->\n' +
+    '```\n' +
+    '\n' +
+    'and:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:start -->\n' +
+    '...\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:end -->\n' +
+    '```\n' +
+    '\n' +
+    'Use `replace_region` for whole-region changes.\n' +
+    '\n' +
+    'A Tool Descriptor uses:\n' +
+    '\n' +
+    '- `schema: "stickshift-tool"`;\n' +
+    '- `version: "1.0"`;\n' +
+    '- `open.protocol: "HTML_OPEN"`;\n' +
+    '- either `skill: null` or `{ "elementId": "tool-skill", "slug": "{{SKILL_SLUG}}" }`.\n' +
+    '\n' +
+    'An optional Tool Skill uses a source-resident block placed before `</body>`:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:start -->\n' +
+    '<script type="text/markdown" id="tool-skill">\n' +
+    '---\n' +
+    'name: {{SKILL_SLUG}}\n' +
+    'description: ...\n' +
+    '---\n' +
+    '...skill markdown...\n' +
+    '</script>\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:end -->\n' +
+    '```\n' +
+    '\n' +
+    '`{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are substituted during export.\n' +
+    '\n' +
+    'The distinctions are:\n' +
+    '\n' +
+    '- `skills/local-html-ide.md` is the immutable IDE coding skill used to operate the editor;\n' +
+    '- `tool-skill` is an optional StickShift companion installed with a registered tool;\n' +
+    '- `app-skill` and `app-runtime-contract` are optional external application-runtime conventions.\n' +
+    '\n' +
+    'These may coexist when the application architecture requires them.\n' +
+    '\n' +
+    '## Editing an Existing Application\n' +
+    '\n' +
+    'For edits to an existing application, return one structured JSON `html-ide-patch` version `2.0` packet.\n' +
+    '\n' +
+    'The user pastes the packet into the AI Update Drawer.\n' +
+    '\n' +
+    'Include:\n' +
+    '\n' +
+    '- the exact current `target.sourceHash`;\n' +
+    '- unique patch IDs;\n' +
+    '- explicit `expectedMatches`;\n' +
+    '- exact source search text;\n' +
+    '- only supported operations.\n' +
+    '\n' +
+    'Supported operations are:\n' +
+    '\n' +
+    '- `replace`;\n' +
+    '- `insert_before`;\n' +
+    '- `insert_after`;\n' +
+    '- `delete`;\n' +
+    '- `replace_region`.\n' +
+    '\n' +
+    'Named-region operations use:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:name:start -->\n' +
+    '...\n' +
+    '<!-- HTML_IDE_REGION:name:end -->\n' +
+    '```\n' +
+    '\n' +
+    'The IDE uses exact matching only.\n' +
+    '\n' +
+    'Treat the packet as one atomic transaction. One malformed, ambiguous, zero-match, stale-hash, invalid-region, or overlapping patch rejects the complete packet.\n' +
+    '\n' +
+    'A rejected packet does not change the canonical source.\n' +
+    '\n' +
+    '## Structured AI Update Packet Format\n' +
+    '\n' +
+    '```json\n' +
+    '{\n' +
+    '  "protocol": "html-ide-patch",\n' +
+    '  "version": "2.0",\n' +
+    '  "target": {\n' +
+    '    "sourceHash": "sha256:..."\n' +
+    '  },\n' +
+    '  "patches": [\n' +
+    '    {\n' +
+    '      "id": "change-button-label",\n' +
+    '      "operation": "replace",\n' +
+    '      "matching": {\n' +
+    '        "strategy": "exact",\n' +
+    '        "expectedMatches": 1,\n' +
+    '        "search": "<button>Save</button>"\n' +
+    '      },\n' +
+    '      "replacement": "<button>Export</button>"\n' +
+    '    }\n' +
+    '  ]\n' +
+    '}\n' +
+    '```\n' +
+    '\n' +
+    '## Rules for Generating Packets\n' +
+    '\n' +
+    '### 1. Exact Matches Only\n' +
+    '\n' +
+    'In version `2.0`, `matching.strategy` must be `exact`.\n' +
+    '\n' +
+    'Do not request:\n' +
+    '\n' +
+    '- fuzzy matching;\n' +
+    '- regex matching;\n' +
+    '- semantic matching;\n' +
+    '- indentation matching;\n' +
+    '- whitespace-normalized matching.\n' +
+    '\n' +
+    '### 2. Use the Current Source Hash\n' +
+    '\n' +
+    'Use the exact `target.sourceHash` supplied by the IDE or user.\n' +
+    '\n' +
+    'A rejected atomic packet does not change the source. The current source hash remains valid until a patch is accepted or the canonical source changes through another action.\n' +
+    '\n' +
+    'Request a new source hash after:\n' +
+    '\n' +
+    '- an accepted patch;\n' +
+    '- a manual source edit;\n' +
+    '- an import;\n' +
+    '- a reset;\n' +
+    '- another action that changes the canonical source.\n' +
+    '\n' +
+    'Do not request a new hash solely because a packet was rejected.\n' +
+    '\n' +
+    '### 3. Ask for the Exact Failure Message\n' +
+    '\n' +
+    'When a packet fails, ask the user to copy and paste the exact IDE failure message.\n' +
+    '\n' +
+    'Do not guess the failure category from memory.\n' +
+    '\n' +
+    'Use the reported message to identify:\n' +
+    '\n' +
+    '- expected match count mismatch;\n' +
+    '- zero matches;\n' +
+    '- malformed JSON;\n' +
+    '- overlapping ranges;\n' +
+    '- stale source hash;\n' +
+    '- invalid named region;\n' +
+    '- unsupported operation;\n' +
+    '- another preflight error.\n' +
+    '\n' +
+    'Then re-read the affected current source and revise the packet.\n' +
+    '\n' +
+    'Reuse the same source hash when the source did not change.\n' +
+    '\n' +
+    '### 4. Verify Every Match Count\n' +
+    '\n' +
+    'Before emitting a packet:\n' +
+    '\n' +
+    '1. Inspect the current source.\n' +
+    '2. Copy every `matching.search` string exactly.\n' +
+    '3. Count its exact occurrences.\n' +
+    '4. Set `expectedMatches` to the verified count.\n' +
+    '\n' +
+    'Rules:\n' +
+    '\n' +
+    '- If the search appears zero times, do not emit the packet.\n' +
+    '- If it appears once and one change is intended, use `expectedMatches: 1`.\n' +
+    '- If it appears multiple times and every occurrence should change identically, use the actual count.\n' +
+    '- If it appears multiple times but only one should change, add stable surrounding context until the search is unique.\n' +
+    '\n' +
+    '### 5. Avoid Ambiguous Isolated Lines\n' +
+    '\n' +
+    'Do not patch common single lines in isolation.\n' +
+    '\n' +
+    'Avoid search strings consisting only of:\n' +
+    '\n' +
+    '- common loop headers;\n' +
+    '- reset statements;\n' +
+    '- button disabled assignments;\n' +
+    '- generic logging lines;\n' +
+    '- repeated state assignments;\n' +
+    '- common closing braces;\n' +
+    '- short declarations that occur in multiple functions.\n' +
+    '\n' +
+    'Use a unique local mini-block with function-specific context.\n' +
+    '\n' +
+    'Useful context includes:\n' +
+    '\n' +
+    '- nearby status text;\n' +
+    '- local variable declarations;\n' +
+    '- adjacent input or file reset lines;\n' +
+    '- surrounding control flow;\n' +
+    '- a unique function name;\n' +
+    '- a unique configuration key.\n' +
+    '\n' +
+    '### 6. Choose Stable Search Blocks\n' +
+    '\n' +
+    'A good exact search block is:\n' +
+    '\n' +
+    '- copied exactly from current source;\n' +
+    '- large enough to be unique;\n' +
+    '- small enough to avoid unrelated drift;\n' +
+    '- anchored by stable semantic context;\n' +
+    '- free of unnecessary escaping risk.\n' +
+    '\n' +
+    'Do not rely on remembered source text or guessed indentation.\n' +
+    '\n' +
+    '### 7. Prefer Named Regions for Whole Blocks\n' +
+    '\n' +
+    'When a complete block already uses `HTML_IDE_REGION` markers, use `replace_region`.\n' +
+    '\n' +
+    'Do not replace a complete named region through a broad exact-text search when `replace_region` is available.\n' +
+    '\n' +
+    '### 8. Reduce Regex and Escaping Risk\n' +
+    '\n' +
+    'Large JSON search strings containing JavaScript regex literals, many backslashes, nested quotes, replacement strings, or template literals are fragile.\n' +
+    '\n' +
+    'Prefer:\n' +
+    '\n' +
+    '- a simple insertion anchor such as a unique function declaration;\n' +
+    '- a nearby data or configuration change;\n' +
+    '- the smallest exact source segment that achieves the edit;\n' +
+    '- a named region;\n' +
+    '- a small call-site modification.\n' +
+    '\n' +
+    'If a regex-heavy search returns zero matches, do not guess new backslash counts. Re-read the source and change strategy.\n' +
+    '\n' +
+    '### 9. Prefer Data and Configuration Changes\n' +
+    '\n' +
+    'Before replacing a complex parser, validator, or classifier function, determine whether the result can be achieved through:\n' +
+    '\n' +
+    '- data;\n' +
+    '- aliases;\n' +
+    '- constants;\n' +
+    '- category order;\n' +
+    '- lookup tables;\n' +
+    '- configuration;\n' +
+    '- a small condition;\n' +
+    '- a small call-site change.\n' +
+    '\n' +
+    'Prefer the lower-risk change when it preserves the intended architecture.\n' +
+    '\n' +
+    '### 10. Reuse Canonical Runtime State\n' +
+    '\n' +
+    'Do not duplicate parser or validation logic solely for diagnostics.\n' +
+    '\n' +
+    'When a canonical parse result, token list, match list, or validation result already exists, reu'... 4844 more characters,
+  expected: '---\n' +
+    'okf_version: "0.1"\n' +
+    'type: Skill\n' +
+    'title: Local HTML IDE Code Updater\n' +
+    'description: Modify, edit, or refactor HTML, CSS, and JavaScript code in the Local HTML IDE workspace using structured html-ide-patch v2 packets and offline library stem tags.\n' +
+    'tags: [skill, html-tool, code-editor]\n' +
+    '---\n' +
+    '\n' +
+    '# local-html-ide\n' +
+    '\n' +
+    '## Purpose\n' +
+    '\n' +
+    'Use this skill to create or modify HTML, CSS, and JavaScript inside the active Local HTML IDE workspace.\n' +
+    '\n' +
+    'For an existing application, use the structured `html-ide-patch` version `2.0` protocol. For a new application, return one complete HTML document.\n' +
+    '\n' +
+    '## Available Offline Libraries\n' +
+    '\n' +
+    'The IDE contains preloaded offline library assets. Add a library by placing its literal Stem Tag in the editable HTML source.\n' +
+    '\n' +
+    '- **Alpine.js**: `<script id="lib-alpine-stem"></script>`\n' +
+    '- **Pico.css**: `<link rel="stylesheet" id="lib-picocss-stem">`\n' +
+    '- **JSZip**: `<script id="lib-jszip-stem"></script>`\n' +
+    '- **docxtemplater**: `<script id="lib-docxtemplater-stem"></script>`\n' +
+    '- **docx**: `<script id="lib-docx-stem"></script>`\n' +
+    '- **Mammoth.js**: `<script id="lib-mammoth-stem"></script>`\n' +
+    '- **SheetJS (xlsx)**: `<script id="lib-sheetjs-stem"></script>`\n' +
+    '- **PptxGenJS**: `<script id="lib-pptxgen-stem"></script>`\n' +
+    '- **PDF.js**: `<script id="lib-pdfjs-stem"></script>`\n' +
+    '\n' +
+    'Never paste the complete minified library payload into an application update. Insert the Stem Tag. The compiler inlines the offline library during preview or download.\n' +
+    '\n' +
+    'Do not use a CDN URL when an equivalent offline Stem exists.\n' +
+    '\n' +
+    '## Create Mode\n' +
+    '\n' +
+    'For a new application, prefer exactly one raw, complete HTML document with no surrounding commentary.\n' +
+    '\n' +
+    'The IDE also accepts exactly one complete `html` Markdown fence.\n' +
+    '\n' +
+    'Do not return:\n' +
+    '\n' +
+    '- prose before or after the document;\n' +
+    '- multiple Markdown fences;\n' +
+    '- unmatched fences;\n' +
+    '- partial HTML fragments;\n' +
+    '- a non-HTML fenced block;\n' +
+    '- a bundled minified library when an offline Stem exists.\n' +
+    '\n' +
+    'A complete application should include the necessary document structure, styling, interface, event listeners, and runtime behavior.\n' +
+    '\n' +
+    '## Optional External Application Runtime Conventions\n' +
+    '\n' +
+    'Some applications independently use an external LLM runtime. Those applications may use conventions such as:\n' +
+    '\n' +
+    '```html\n' +
+    '<script id="app-skill" type="text/markdown">\n' +
+    '...\n' +
+    '<\\/script>\n' +
+    '```\n' +
+    '\n' +
+    'or:\n' +
+    '\n' +
+    '```html\n' +
+    '<script id="app-runtime-contract" type="application/json">\n' +
+    '...\n' +
+    '<\\/script>\n' +
+    '```\n' +
+    '\n' +
+    'These are optional application-level conventions.\n' +
+    '\n' +
+    'They are:\n' +
+    '\n' +
+    '- not required by the Local HTML IDE;\n' +
+    '- not part of `html-ide-patch` version `2.0`;\n' +
+    '- not required or interpreted for ordinary IDE compilation;\n' +
+    "- added only when the application's external runtime contract requires them.\n" +
+    '\n' +
+    'Do not confuse these optional application-runtime blocks with the Local HTML IDE coding skill or a StickShift Tool Skill.\n' +
+    '\n' +
+    '## Tool Descriptor and Optional Tool Skill\n' +
+    '\n' +
+    'A standalone application may contain neither integration block.\n' +
+    '\n' +
+    'A registered StickShift tool contains one Tool Descriptor and may contain one optional Tool Skill.\n' +
+    '\n' +
+    'The Tool Descriptor is structured metadata, not a skill. It may use `"skill": null`.\n' +
+    '\n' +
+    'Add a Tool Skill only when the registered tool requires LLM-specific operating instructions, interpretation rules, structured workflows, packet contracts, or multi-step agent behavior. Ordinary timers, calculators, dashboards, forms, and games generally do not require one.\n' +
+    '\n' +
+    'The editable application source may contain named regions:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:tool-descriptor:start -->\n' +
+    '...\n' +
+    '<!-- HTML_IDE_REGION:tool-descriptor:end -->\n' +
+    '```\n' +
+    '\n' +
+    'and:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:start -->\n' +
+    '...\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:end -->\n' +
+    '```\n' +
+    '\n' +
+    'Use `replace_region` for whole-region changes.\n' +
+    '\n' +
+    'A Tool Descriptor uses:\n' +
+    '\n' +
+    '- `schema: "stickshift-tool"`;\n' +
+    '- `version: "1.0"`;\n' +
+    '- `open.protocol: "HTML_OPEN"`;\n' +
+    '- either `skill: null` or `{ "elementId": "tool-skill", "slug": "{{SKILL_SLUG}}" }`.\n' +
+    '\n' +
+    'An optional Tool Skill uses a source-resident block placed before `</body>`:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:start -->\n' +
+    '<script type="text/markdown" id="tool-skill">\n' +
+    '---\n' +
+    'name: {{SKILL_SLUG}}\n' +
+    'description: ...\n' +
+    '---\n' +
+    '...skill markdown...\n' +
+    '<\\/script>\n' +
+    '<!-- HTML_IDE_REGION:tool-skill:end -->\n' +
+    '```\n' +
+    '\n' +
+    '`{{TOOL_TITLE}}`, `{{TOOL_FILE}}`, and `{{SKILL_SLUG}}` are substituted during export.\n' +
+    '\n' +
+    'The distinctions are:\n' +
+    '\n' +
+    '- `skills/local-html-ide.md` is the immutable IDE coding skill used to operate the editor;\n' +
+    '- `tool-skill` is an optional StickShift companion installed with a registered tool;\n' +
+    '- `app-skill` and `app-runtime-contract` are optional external application-runtime conventions.\n' +
+    '\n' +
+    'These may coexist when the application architecture requires them.\n' +
+    '\n' +
+    '## Editing an Existing Application\n' +
+    '\n' +
+    'For edits to an existing application, return one structured JSON `html-ide-patch` version `2.0` packet.\n' +
+    '\n' +
+    'The user pastes the packet into the AI Update Drawer.\n' +
+    '\n' +
+    'Include:\n' +
+    '\n' +
+    '- the exact current `target.sourceHash`;\n' +
+    '- unique patch IDs;\n' +
+    '- explicit `expectedMatches`;\n' +
+    '- exact source search text;\n' +
+    '- only supported operations.\n' +
+    '\n' +
+    'Supported operations are:\n' +
+    '\n' +
+    '- `replace`;\n' +
+    '- `insert_before`;\n' +
+    '- `insert_after`;\n' +
+    '- `delete`;\n' +
+    '- `replace_region`.\n' +
+    '\n' +
+    'Named-region operations use:\n' +
+    '\n' +
+    '```html\n' +
+    '<!-- HTML_IDE_REGION:name:start -->\n' +
+    '...\n' +
+    '<!-- HTML_IDE_REGION:name:end -->\n' +
+    '```\n' +
+    '\n' +
+    'The IDE uses exact matching only.\n' +
+    '\n' +
+    'Treat the packet as one atomic transaction. One malformed, ambiguous, zero-match, stale-hash, invalid-region, or overlapping patch rejects the complete packet.\n' +
+    '\n' +
+    'A rejected packet does not change the canonical source.\n' +
+    '\n' +
+    '## Structured AI Update Packet Format\n' +
+    '\n' +
+    '```json\n' +
+    '{\n' +
+    '  "protocol": "html-ide-patch",\n' +
+    '  "version": "2.0",\n' +
+    '  "target": {\n' +
+    '    "sourceHash": "sha256:..."\n' +
+    '  },\n' +
+    '  "patches": [\n' +
+    '    {\n' +
+    '      "id": "change-button-label",\n' +
+    '      "operation": "replace",\n' +
+    '      "matching": {\n' +
+    '        "strategy": "exact",\n' +
+    '        "expectedMatches": 1,\n' +
+    '        "search": "<button>Save</button>"\n' +
+    '      },\n' +
+    '      "replacement": "<button>Export</button>"\n' +
+    '    }\n' +
+    '  ]\n' +
+    '}\n' +
+    '```\n' +
+    '\n' +
+    '## Rules for Generating Packets\n' +
+    '\n' +
+    '### 1. Exact Matches Only\n' +
+    '\n' +
+    'In version `2.0`, `matching.strategy` must be `exact`.\n' +
+    '\n' +
+    'Do not request:\n' +
+    '\n' +
+    '- fuzzy matching;\n' +
+    '- regex matching;\n' +
+    '- semantic matching;\n' +
+    '- indentation matching;\n' +
+    '- whitespace-normalized matching.\n' +
+    '\n' +
+    '### 2. Use the Current Source Hash\n' +
+    '\n' +
+    'Use the exact `target.sourceHash` supplied by the IDE or user.\n' +
+    '\n' +
+    'A rejected atomic packet does not change the source. The current source hash remains valid until a patch is accepted or the canonical source changes through another action.\n' +
+    '\n' +
+    'Request a new source hash after:\n' +
+    '\n' +
+    '- an accepted patch;\n' +
+    '- a manual source edit;\n' +
+    '- an import;\n' +
+    '- a reset;\n' +
+    '- another action that changes the canonical source.\n' +
+    '\n' +
+    'Do not request a new hash solely because a packet was rejected.\n' +
+    '\n' +
+    '### 3. Ask for the Exact Failure Message\n' +
+    '\n' +
+    'When a packet fails, ask the user to copy and paste the exact IDE failure message.\n' +
+    '\n' +
+    'Do not guess the failure category from memory.\n' +
+    '\n' +
+    'Use the reported message to identify:\n' +
+    '\n' +
+    '- expected match count mismatch;\n' +
+    '- zero matches;\n' +
+    '- malformed JSON;\n' +
+    '- overlapping ranges;\n' +
+    '- stale source hash;\n' +
+    '- invalid named region;\n' +
+    '- unsupported operation;\n' +
+    '- another preflight error.\n' +
+    '\n' +
+    'Then re-read the affected current source and revise the packet.\n' +
+    '\n' +
+    'Reuse the same source hash when the source did not change.\n' +
+    '\n' +
+    '### 4. Verify Every Match Count\n' +
+    '\n' +
+    'Before emitting a packet:\n' +
+    '\n' +
+    '1. Inspect the current source.\n' +
+    '2. Copy every `matching.search` string exactly.\n' +
+    '3. Count its exact occurrences.\n' +
+    '4. Set `expectedMatches` to the verified count.\n' +
+    '\n' +
+    'Rules:\n' +
+    '\n' +
+    '- If the search appears zero times, do not emit the packet.\n' +
+    '- If it appears once and one change is intended, use `expectedMatches: 1`.\n' +
+    '- If it appears multiple times and every occurrence should change identically, use the actual count.\n' +
+    '- If it appears multiple times but only one should change, add stable surrounding context until the search is unique.\n' +
+    '\n' +
+    '### 5. Avoid Ambiguous Isolated Lines\n' +
+    '\n' +
+    'Do not patch common single lines in isolation.\n' +
+    '\n' +
+    'Avoid search strings consisting only of:\n' +
+    '\n' +
+    '- common loop headers;\n' +
+    '- reset statements;\n' +
+    '- button disabled assignments;\n' +
+    '- generic logging lines;\n' +
+    '- repeated state assignments;\n' +
+    '- common closing braces;\n' +
+    '- short declarations that occur in multiple functions.\n' +
+    '\n' +
+    'Use a unique local mini-block with function-specific context.\n' +
+    '\n' +
+    'Useful context includes:\n' +
+    '\n' +
+    '- nearby status text;\n' +
+    '- local variable declarations;\n' +
+    '- adjacent input or file reset lines;\n' +
+    '- surrounding control flow;\n' +
+    '- a unique function name;\n' +
+    '- a unique configuration key.\n' +
+    '\n' +
+    '### 6. Choose Stable Search Blocks\n' +
+    '\n' +
+    'A good exact search block is:\n' +
+    '\n' +
+    '- copied exactly from current source;\n' +
+    '- large enough to be unique;\n' +
+    '- small enough to avoid unrelated drift;\n' +
+    '- anchored by stable semantic context;\n' +
+    '- free of unnecessary escaping risk.\n' +
+    '\n' +
+    'Do not rely on remembered source text or guessed indentation.\n' +
+    '\n' +
+    '### 7. Prefer Named Regions for Whole Blocks\n' +
+    '\n' +
+    'When a complete block already uses `HTML_IDE_REGION` markers, use `replace_region`.\n' +
+    '\n' +
+    'Do not replace a complete named region through a broad exact-text search when `replace_region` is available.\n' +
+    '\n' +
+    '### 8. Reduce Regex and Escaping Risk\n' +
+    '\n' +
+    'Large JSON search strings containing JavaScript regex literals, many backslashes, nested quotes, replacement strings, or template literals are fragile.\n' +
+    '\n' +
+    'Prefer:\n' +
+    '\n' +
+    '- a simple insertion anchor such as a unique function declaration;\n' +
+    '- a nearby data or configuration change;\n' +
+    '- the smallest exact source segment that achieves the edit;\n' +
+    '- a named region;\n' +
+    '- a small call-site modification.\n' +
+    '\n' +
+    'If a regex-heavy search returns zero matches, do not guess new backslash counts. Re-read the source and change strategy.\n' +
+    '\n' +
+    '### 9. Prefer Data and Configuration Changes\n' +
+    '\n' +
+    'Before replacing a complex parser, validator, or classifier function, determine whether the result can be achieved through:\n' +
+    '\n' +
+    '- data;\n' +
+    '- aliases;\n' +
+    '- constants;\n' +
+    '- category order;\n' +
+    '- lookup tables;\n' +
+    '- configuration;\n' +
+    '- a small condition;\n' +
+    '- a small call-site change.\n' +
+    '\n' +
+    'Prefer the lower-risk change when it preserves the intended architecture.\n' +
+    '\n' +
+    '### 10. Reuse Canonical Runtime State\n' +
+    '\n' +
+    'Do not duplicate parser or validation logic solely for diagnostics.\n' +
+    '\n' +
+    'When a canonical parse result, token list, match list, or validation result already exists, '... 4847 more characters,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v22.23.1
