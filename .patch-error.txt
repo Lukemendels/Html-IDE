@@ -1,9 +1,3 @@
 /home/runner/work/Html-IDE/Html-IDE/tools/apply_stickshift_install_contract.py:105: SyntaxWarning: invalid escape sequence '\/'
   '''    function readEmbeddedStickShiftSkill() {
-Traceback (most recent call last):
-  File "/home/runner/work/Html-IDE/Html-IDE/tools/apply_stickshift_install_contract.py", line 205, in <module>
-    build = replace_once(
-            ^^^^^^^^^^^^^
-  File "/home/runner/work/Html-IDE/Html-IDE/tools/apply_stickshift_install_contract.py", line 19, in replace_once
-    raise RuntimeError(f"{label}: expected 1 exact match, found {count}")
-RuntimeError: add canonical IDE skill loader: expected 1 exact match, found 0
+Applied HTML IDE StickShift installation-contract patch.
